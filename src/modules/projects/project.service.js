@@ -1,0 +1,178 @@
+import Project from './project.model.js';
+import Task from '../tasks/task.model.js';
+import Milestone from './milestone.model.js';
+import { AppError, buildPaginationMeta } from '../../utils/index.js';
+
+class ProjectService {
+  // ─── Projects ────────────────────────────────────────
+
+  async getAll(query = {}, userId, userRole) {
+    const { page = 1, limit = 20, search, type, status, domain, sortBy = 'createdAt', sortOrder = 'desc' } = query;
+
+    const conditions = [];
+
+    if (search) {
+      conditions.push({
+        $or: [
+          { name: { $regex: search, $options: 'i' } },
+          { code: { $regex: search, $options: 'i' } },
+        ],
+      });
+    }
+    if (type) conditions.push({ type });
+    if (status) conditions.push({ status });
+    if (domain) conditions.push({ domains: domain });
+
+    // Scoped access: non-admins only see their projects
+    if (userRole === 'developer') {
+      conditions.push({ $or: [{ developers: userId }, { projectManager: userId }] });
+    } else if (userRole === 'project_manager') {
+      conditions.push({ $or: [{ projectManager: userId }, { developers: userId }, { createdBy: userId }] });
+    }
+
+    const filter = conditions.length > 0 ? { $and: conditions } : {};
+
+    const sort = { [sortBy]: sortOrder === 'asc' ? 1 : -1 };
+    const skip = (page - 1) * limit;
+
+    const [projects, total] = await Promise.all([
+      Project.find(filter)
+        .populate('projectManager', 'name email avatar')
+        .populate('developers', 'name email avatar')
+        .sort(sort)
+        .skip(skip)
+        .limit(limit),
+      Project.countDocuments(filter),
+    ]);
+
+    return { projects, meta: buildPaginationMeta(total, page, limit) };
+  }
+
+  async getById(id, userId, userRole) {
+    const project = await Project.findById(id)
+      .populate('projectManager', 'name email avatar designation')
+      .populate('developers', 'name email avatar designation')
+      .populate('createdBy', 'name email');
+
+    if (!project) {
+      throw new AppError('Project not found', 404, 'NOT_FOUND');
+    }
+
+    // Access check for non-admins
+    if (userRole !== 'super_admin') {
+      const isMember =
+        project.projectManager?._id.toString() === userId ||
+        project.developers.some((d) => d._id.toString() === userId) ||
+        project.createdBy?._id.toString() === userId;
+      if (!isMember) {
+        throw new AppError('Access denied to this project', 403, 'FORBIDDEN');
+      }
+    }
+
+    return project;
+  }
+
+  async create(data, userId) {
+    const project = await Project.create({ ...data, createdBy: userId });
+    return Project.findById(project._id)
+      .populate('projectManager', 'name email avatar')
+      .populate('developers', 'name email avatar');
+  }
+
+  async update(id, data) {
+    // Get old project to detect removed team members
+    const oldProject = await Project.findById(id).select('projectManager developers');
+    if (!oldProject) {
+      throw new AppError('Project not found', 404, 'NOT_FOUND');
+    }
+
+    const project = await Project.findByIdAndUpdate(id, data, { new: true, runValidators: true })
+      .populate('projectManager', 'name email avatar')
+      .populate('developers', 'name email avatar');
+
+    // Unassign removed members from all tasks in this project
+    if (data.developers !== undefined || data.projectManager !== undefined) {
+      const oldTeam = new Set([
+        oldProject.projectManager?.toString(),
+        ...oldProject.developers.map((d) => d.toString()),
+      ].filter(Boolean));
+
+      const newTeam = new Set([
+        (data.projectManager || project.projectManager?._id)?.toString(),
+        ...(data.developers || project.developers.map((d) => d._id)).map((d) => d.toString()),
+      ].filter(Boolean));
+
+      const removedMembers = [...oldTeam].filter((id) => !newTeam.has(id));
+
+      if (removedMembers.length > 0) {
+        await Task.updateMany(
+          { project: id, assignees: { $in: removedMembers } },
+          { $pull: { assignees: { $in: removedMembers } } }
+        );
+      }
+    }
+
+    return project;
+  }
+
+  async delete(id) {
+    const project = await Project.findByIdAndDelete(id);
+    if (!project) {
+      throw new AppError('Project not found', 404, 'NOT_FOUND');
+    }
+    return project;
+  }
+
+  async getTeamMembers(projectId) {
+    const project = await Project.findById(projectId)
+      .populate('projectManager', 'name email avatar designation role')
+      .populate('developers', 'name email avatar designation role');
+
+    if (!project) {
+      throw new AppError('Project not found', 404, 'NOT_FOUND');
+    }
+
+    const members = [];
+    if (project.projectManager) {
+      members.push({ ...project.projectManager.toObject(), projectRole: 'project_manager' });
+    }
+    for (const dev of project.developers) {
+      members.push({ ...dev.toObject(), projectRole: 'developer' });
+    }
+    return members;
+  }
+
+  // ─── Milestones ──────────────────────────────────────
+
+  async getMilestones(projectId) {
+    return Milestone.find({ project: projectId })
+      .sort({ dueDate: 1, createdAt: 1 })
+      .populate('createdBy', 'name');
+  }
+
+  async createMilestone(projectId, data, userId) {
+    const project = await Project.findById(projectId);
+    if (!project) {
+      throw new AppError('Project not found', 404, 'NOT_FOUND');
+    }
+    return Milestone.create({ ...data, project: projectId, createdBy: userId });
+  }
+
+  async updateMilestone(milestoneId, data) {
+    const milestone = await Milestone.findByIdAndUpdate(milestoneId, data, { new: true, runValidators: true });
+    if (!milestone) {
+      throw new AppError('Milestone not found', 404, 'NOT_FOUND');
+    }
+    return milestone;
+  }
+
+  async deleteMilestone(milestoneId) {
+    const milestone = await Milestone.findByIdAndDelete(milestoneId);
+    if (!milestone) {
+      throw new AppError('Milestone not found', 404, 'NOT_FOUND');
+    }
+    return milestone;
+  }
+}
+
+export default new ProjectService();
