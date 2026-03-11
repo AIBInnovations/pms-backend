@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import authController from './auth.controller.js';
-import { validate, auth, authLimiter } from '../../middleware/index.js';
+import { validate, auth } from '../../middleware/index.js';
 import {
   registerSchema,
   loginSchema,
@@ -69,7 +69,7 @@ const router = Router();
  *       409:
  *         description: Email already in use
  */
-router.post('/register', authLimiter, validate(registerSchema), authController.register.bind(authController));
+router.post('/register', validate(registerSchema), authController.register.bind(authController));
 
 /**
  * @swagger
@@ -126,7 +126,7 @@ router.post('/register', authLimiter, validate(registerSchema), authController.r
  *       429:
  *         description: Too many login attempts
  */
-router.post('/login', authLimiter, validate(loginSchema), authController.login.bind(authController));
+router.post('/login', validate(loginSchema), authController.login.bind(authController));
 
 /**
  * @swagger
@@ -228,7 +228,7 @@ router.post('/refresh-token', validate(refreshTokenSchema), authController.refre
  *       429:
  *         description: Too many requests
  */
-router.post('/forgot-password', authLimiter, validate(forgotPasswordSchema), authController.forgotPassword.bind(authController));
+router.post('/forgot-password', validate(forgotPasswordSchema), authController.forgotPassword.bind(authController));
 
 /**
  * @swagger
@@ -272,7 +272,7 @@ router.post('/forgot-password', authLimiter, validate(forgotPasswordSchema), aut
  *       429:
  *         description: Too many requests
  */
-router.post('/reset-password', authLimiter, validate(resetPasswordSchema), authController.resetPassword.bind(authController));
+router.post('/reset-password', validate(resetPasswordSchema), authController.resetPassword.bind(authController));
 
 /**
  * @swagger

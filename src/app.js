@@ -6,7 +6,7 @@ import hpp from 'hpp';
 import swaggerUi from 'swagger-ui-express';
 import swaggerSpec from './config/swagger.js';
 import { env } from './config/index.js';
-import { errorHandler, apiLimiter, authLimiter, searchLimiter } from './middleware/index.js';
+import { errorHandler } from './middleware/index.js';
 import authRoutes from './modules/auth/auth.routes.js';
 import userRoutes from './modules/users/user.routes.js';
 import projectRoutes from './modules/projects/project.routes.js';
@@ -64,18 +64,13 @@ app.use(hpp());
 // Static files
 app.use('/uploads', express.static('uploads'));
 
-// Rate limiting (disabled in development)
-if (env.nodeEnv === 'production') {
-  app.use('/api', apiLimiter);
-}
-
 // Health check
 app.get('/api/health', (req, res) => {
   res.json({ success: true, message: 'PMS API is running', timestamp: new Date().toISOString() });
 });
 
 // Routes
-app.use('/api/v1/auth', ...(env.nodeEnv === 'production' ? [authLimiter] : []), authRoutes);
+app.use('/api/v1/auth', authRoutes);
 app.use('/api/v1/users', userRoutes);
 app.use('/api/v1/projects', projectRoutes);
 app.use('/api/v1/tasks', taskRoutes);
@@ -86,7 +81,7 @@ app.use('/api/v1/notifications', notificationRoutes);
 app.use('/api/v1/reports', reportRoutes);
 app.use('/api/v1/settings', settingsRoutes);
 app.use('/api/v1/audit', auditRoutes);
-app.use('/api/v1/search', ...(env.nodeEnv === 'production' ? [searchLimiter] : []), searchRoutes);
+app.use('/api/v1/search', searchRoutes);
 
 // Swagger API docs
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, { customCss: '.swagger-ui .topbar { display: none }' }));
