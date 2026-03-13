@@ -1,12 +1,15 @@
 import AuditLog from './audit.model.js';
 
 const ACTION_LABELS = {
-  create_task: 'created task',
-  update_task: 'updated task',
-  delete_task: 'deleted task',
-  create_project: 'created project',
-  update_project: 'updated project',
-  delete_project: 'deleted project',
+  create_task: 'created a task',
+  update_task: 'updated a task',
+  delete_task: 'deleted a task',
+  create_project: 'created a project',
+  update_project: 'updated a project',
+  delete_project: 'deleted a project',
+  create_milestone: 'added a milestone',
+  update_milestone: 'updated a milestone',
+  delete_milestone: 'deleted a milestone',
   create_comments: 'added a comment',
   update_comments: 'updated a comment',
   delete_comments: 'deleted a comment',
@@ -24,7 +27,7 @@ function formatLog(log) {
   };
 }
 
-const ACTIVITY_MODULES = ['tasks', 'projects', 'comments', 'documents'];
+const ACTIVITY_MODULES = ['task', 'project', 'milestone', 'comments', 'documents'];
 
 class ActivityService {
   async getGlobal(query = {}) {
