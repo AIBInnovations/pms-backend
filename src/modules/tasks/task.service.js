@@ -173,6 +173,11 @@ class TaskService {
     const oldStage = task.stage;
     task.stage = newStage;
 
+    // Auto-escalate priority when sent to backlog
+    if (newStage === 'backlog' && task.priority !== 'critical') {
+      task.priority = 'high';
+    }
+
     // Silently log the transition
     task.stageHistory.push({
       from: oldStage,
