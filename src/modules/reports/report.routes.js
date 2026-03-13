@@ -7,6 +7,7 @@ const router = Router();
 router.use(auth);
 router.use(rbac('super_admin', 'project_manager'));
 
+router.get('/org-overview', reportController.orgOverview.bind(reportController));
 router.get('/project-progress', validate(reportQuerySchema, 'query'), reportController.projectProgress.bind(reportController));
 router.get('/project-progress/:projectId', reportController.projectProgress.bind(reportController));
 router.get('/bug-summary', validate(reportQuerySchema, 'query'), reportController.bugSummary.bind(reportController));

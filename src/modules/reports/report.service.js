@@ -158,6 +158,61 @@ class ReportService {
     return results.sort((a, b) => b.totalTasks - a.totalTasks);
   }
 
+  async orgOverview() {
+    const [projectsByStatus, tasksByStage, tasksByPriority, bugsByStage, activeDevelopers, projectHealth] = await Promise.all([
+      Project.aggregate([{ $group: { _id: '$status', count: { $sum: 1 } } }]),
+      Task.aggregate([{ $match: { parentTask: null } }, { $group: { _id: '$stage', count: { $sum: 1 } } }]),
+      Task.aggregate([{ $match: { parentTask: null } }, { $group: { _id: '$priority', count: { $sum: 1 } } }]),
+      Task.aggregate([{ $match: { type: 'bug' } }, { $group: { _id: '$stage', count: { $sum: 1 } } }]),
+      User.countDocuments({ status: 'active', role: 'developer' }),
+      Project.aggregate([
+        {
+          $lookup: {
+            from: 'tasks',
+            let: { projectId: '$_id' },
+            pipeline: [
+              { $match: { $expr: { $and: [{ $eq: ['$project', '$$projectId'] }, { $eq: [{ $type: '$parentTask' }, 'missing'] }] } } },
+            ],
+            as: 'tasks',
+          },
+        },
+        {
+          $project: {
+            name: 1, status: 1, code: 1,
+            totalTasks: { $size: '$tasks' },
+            completedTasks: { $size: { $filter: { input: '$tasks', as: 't', cond: { $eq: ['$$t.stage', 'done'] } } } },
+            openBugs: { $size: { $filter: { input: '$tasks', as: 't', cond: { $and: [{ $eq: ['$$t.type', 'bug'] }, { $not: [{ $in: ['$$t.stage', ['done', 'archived']] }] }] } } } },
+          },
+        },
+        {
+          $addFields: {
+            completionRate: { $cond: [{ $gt: ['$totalTasks', 0] }, { $round: [{ $multiply: [{ $divide: ['$completedTasks', '$totalTasks'] }, 100] }, 0] }, 0] },
+          },
+        },
+        { $sort: { totalTasks: -1 } },
+      ]),
+    ]);
+
+    const totalTasks = tasksByStage.reduce((sum, s) => sum + s.count, 0);
+    const doneTasks = tasksByStage.find((s) => s._id === 'done')?.count || 0;
+    const openBugs = bugsByStage.filter((s) => !['done', 'archived'].includes(s._id)).reduce((sum, s) => sum + s.count, 0);
+    const totalProjects = projectsByStatus.reduce((sum, s) => sum + s.count, 0);
+
+    return {
+      totalProjects,
+      totalTasks,
+      doneTasks,
+      completionRate: totalTasks > 0 ? Math.round((doneTasks / totalTasks) * 100) : 0,
+      activeDevelopers,
+      openBugs,
+      projectsByStatus,
+      tasksByStage,
+      tasksByPriority,
+      bugsByStage,
+      projectHealth,
+    };
+  }
+
   async exportCSV(type, query) {
     // Generate CSV string based on report type
     let rows = [];

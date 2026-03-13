@@ -23,6 +23,13 @@ class ReportController {
     } catch (error) { next(error); }
   }
 
+  async orgOverview(req, res, next) {
+    try {
+      const data = await reportService.orgOverview();
+      sendSuccess(res, { data });
+    } catch (error) { next(error); }
+  }
+
   async exportCSV(req, res, next) {
     try {
       const { type } = req.params;
