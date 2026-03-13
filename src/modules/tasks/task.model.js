@@ -97,6 +97,10 @@ const taskSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    lastCommentAt: {
+      type: Date,
+      default: null,
+    },
     blockedReason: {
       type: String,
       trim: true,

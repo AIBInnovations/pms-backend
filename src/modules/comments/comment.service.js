@@ -1,5 +1,6 @@
 import Comment from './comment.model.js';
 import User from '../users/user.model.js';
+import Task from '../tasks/task.model.js';
 import { AppError, buildPaginationMeta } from '../../utils/index.js';
 
 function extractMentionNames(body) {
@@ -53,6 +54,12 @@ class CommentService {
     }
 
     const comment = await Comment.create({ ...data, author: userId });
+
+    // Stamp lastCommentAt on the parent task so cards can show new-comment badges
+    if (data.commentableType === 'Task' && data.commentableId) {
+      Task.updateOne({ _id: data.commentableId }, { lastCommentAt: comment.createdAt }).catch(() => {});
+    }
+
     return Comment.findById(comment._id)
       .populate('author', 'name email avatar')
       .populate('mentions', 'name email');
