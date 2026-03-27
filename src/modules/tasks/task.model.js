@@ -106,6 +106,15 @@ const taskSchema = new mongoose.Schema(
       trim: true,
       default: '',
     },
+    isOnHold: {
+      type: Boolean,
+      default: false,
+    },
+    onHoldReason: {
+      type: String,
+      trim: true,
+      default: '',
+    },
     parentTask: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Task',
