@@ -8,8 +8,8 @@ const router = Router();
 router.use(auth);
 
 // Any authenticated non-admin user
-router.post('/check-in', validate(checkInSchema), controller.checkIn.bind(controller));
-router.post('/check-out', validate(checkOutSchema), controller.checkOut.bind(controller));
+router.post('/check-in', controller.checkIn.bind(controller));
+router.post('/check-out', controller.checkOut.bind(controller));
 router.get('/today', controller.getToday.bind(controller));
 router.get('/summary', controller.getMonthlySummary.bind(controller));
 router.get('/', validate(attendanceQuerySchema, 'query'), controller.getAll.bind(controller));
