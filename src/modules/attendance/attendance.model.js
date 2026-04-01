@@ -21,7 +21,7 @@ const attendanceSchema = new mongoose.Schema(
     },
     ip: {
       type: String,
-      required: true,
+      default: 'unknown',
     },
     isSuspicious: {
       type: Boolean,

@@ -14,6 +14,8 @@ class AttendanceController {
       const cleanIp = ip.replace(/^::ffff:/, '');
       const { notes } = req.body;
 
+      console.log('[Attendance] checkIn attempt:', { userId: req.user._id, ip: cleanIp, headers: { xff: req.headers['x-forwarded-for'], xri: req.headers['x-real-ip'] } });
+
       const { attendance, warnings } = await attendanceService.checkIn(
         req.user._id, cleanIp, notes || ''
       );
