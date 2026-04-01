@@ -69,6 +69,10 @@ const userSchema = new mongoose.Schema(
     lastLogin: {
       type: Date,
     },
+    registeredIps: {
+      type: [String],
+      default: [],
+    },
   },
   {
     timestamps: true,

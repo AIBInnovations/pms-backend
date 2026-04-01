@@ -19,6 +19,7 @@ import reportRoutes from './modules/reports/report.routes.js';
 import settingsRoutes from './modules/settings/settings.routes.js';
 import auditRoutes from './modules/notifications/audit.routes.js';
 import searchRoutes from './modules/search/search.routes.js';
+import attendanceRoutes from './modules/attendance/attendance.routes.js';
 
 const app = express();
 
@@ -82,6 +83,7 @@ app.use('/api/v1/reports', reportRoutes);
 app.use('/api/v1/settings', settingsRoutes);
 app.use('/api/v1/audit', auditRoutes);
 app.use('/api/v1/search', searchRoutes);
+app.use('/api/v1/attendance', attendanceRoutes);
 
 // Swagger API docs
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, { customCss: '.swagger-ui .topbar { display: none }' }));
