@@ -10,7 +10,7 @@ class AttendanceService {
    * Check in for today.
    * Returns { attendance, warnings[] }
    */
-  async checkIn(userId, ip, networkName = '', notes = '') {
+  async checkIn(userId, ip, notes = '') {
     const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
 
     // Check if already checked in
@@ -19,7 +19,7 @@ class AttendanceService {
       throw new AppError('Already checked in today', 400, 'ALREADY_CHECKED_IN');
     }
 
-    // Determine suspicion
+    // Determine suspicion based on IP
     const warnings = [];
     let isSuspicious = false;
     let suspiciousReason = '';
@@ -29,7 +29,9 @@ class AttendanceService {
     const isKnownIp = user?.registeredIps?.includes(ip);
 
     if (!isKnownIp && user?.registeredIps?.length > 0) {
-      warnings.push(`Unregistered IP address: ${ip}`);
+      isSuspicious = true;
+      suspiciousReason = `Unregistered IP: ${ip}`;
+      warnings.push(`You are checking in from an unregistered IP address (${ip}). This has been flagged.`);
     }
 
     // Auto-register first IP
@@ -37,23 +39,13 @@ class AttendanceService {
       await User.updateOne({ _id: userId }, { $addToSet: { registeredIps: ip } });
     }
 
-    // Check network
-    if (networkName && networkName !== OFFICE_NETWORK) {
+    // Check if IP is on office subnet (for local network detection)
+    const isOfficeSubnet = ip.startsWith(OFFICE_SUBNET + '.') || ip === '127.0.0.1';
+    if (!isOfficeSubnet && !isSuspicious) {
+      // Not on office subnet — flag as different network
       isSuspicious = true;
-      suspiciousReason = `Network mismatch: "${networkName}" (expected: "${OFFICE_NETWORK}")`;
-      warnings.push(suspiciousReason);
-    }
-
-    // Check if IP is on office subnet
-    if (!ip.startsWith(OFFICE_SUBNET + '.') && ip !== '127.0.0.1' && ip !== '::1') {
-      // Could be public IP — only flag if network also doesn't match
-      if (!networkName || networkName !== OFFICE_NETWORK) {
-        if (!isSuspicious) {
-          isSuspicious = true;
-          suspiciousReason = `IP not on office subnet: ${ip}`;
-          warnings.push(suspiciousReason);
-        }
-      }
+      suspiciousReason = `Outside office network (IP: ${ip})`;
+      warnings.push('You appear to be on a different network. Attendance marked as suspicious.');
     }
 
     const attendance = await Attendance.create({
@@ -61,7 +53,6 @@ class AttendanceService {
       date: today,
       checkIn: new Date(),
       ip,
-      networkName,
       isSuspicious,
       suspiciousReason,
       notes,

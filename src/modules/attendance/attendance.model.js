@@ -23,10 +23,6 @@ const attendanceSchema = new mongoose.Schema(
       type: String,
       required: true,
     },
-    networkName: {
-      type: String,
-      default: '',
-    },
     isSuspicious: {
       type: Boolean,
       default: false,

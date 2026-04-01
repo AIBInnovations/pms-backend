@@ -4,15 +4,18 @@ import { sendSuccess } from '../../utils/index.js';
 class AttendanceController {
   async checkIn(req, res, next) {
     try {
-      // Get IP from request
+      // Get IP from request — try multiple sources
       const ip = req.headers['x-forwarded-for']?.split(',')[0]?.trim()
-        || req.connection?.remoteAddress
+        || req.headers['x-real-ip']
+        || req.socket?.remoteAddress
         || req.ip
-        || '';
-      const { networkName, notes } = req.body;
+        || 'unknown';
+      // Normalize IPv6-mapped IPv4 (::ffff:192.168.x.x → 192.168.x.x)
+      const cleanIp = ip.replace(/^::ffff:/, '');
+      const { notes } = req.body;
 
       const { attendance, warnings } = await attendanceService.checkIn(
-        req.user._id, ip, networkName || '', notes || ''
+        req.user._id, cleanIp, notes || ''
       );
 
       sendSuccess(res, {
