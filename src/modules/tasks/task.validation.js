@@ -35,6 +35,8 @@ export const updateTaskSchema = Joi.object({
   progress: Joi.number().min(0).max(100),
   isBlocked: Joi.boolean(),
   blockedReason: Joi.string().trim().allow(''),
+  isOnHold: Joi.boolean(),
+  onHoldReason: Joi.string().trim().allow(''),
   parentTask: objectId.allow(null),
   milestone: objectId.allow(null),
   checklists: Joi.array().items(
