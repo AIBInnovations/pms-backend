@@ -1,31 +1,38 @@
 import attendanceService from './attendance.service.js';
 import { sendSuccess } from '../../utils/index.js';
 
+// Strip suspicious fields for non-admin users
+function sanitize(doc, userRole) {
+  if (userRole === 'super_admin') return doc;
+  const obj = doc.toJSON ? doc.toJSON() : { ...doc };
+  delete obj.isSuspicious;
+  delete obj.suspiciousReason;
+  delete obj.ip;
+  return obj;
+}
+
+function sanitizeMany(docs, userRole) {
+  if (userRole === 'super_admin') return docs;
+  return docs.map((d) => sanitize(d, userRole));
+}
+
 class AttendanceController {
   async checkIn(req, res, next) {
     try {
-      // Get IP from request — try multiple sources
       const ip = req.headers['x-forwarded-for']?.split(',')[0]?.trim()
         || req.headers['x-real-ip']
         || req.socket?.remoteAddress
         || req.ip
         || 'unknown';
-      // Normalize IPv6-mapped IPv4 (::ffff:192.168.x.x → 192.168.x.x)
       const cleanIp = ip.replace(/^::ffff:/, '');
       const { notes } = req.body;
+      const userId = req.user.id || req.user._id;
 
-      const userId = req.user.id || (req.user.id || req.user._id);
-
-      const { attendance, warnings } = await attendanceService.checkIn(
-        userId, cleanIp, notes || ''
-      );
+      const attendance = await attendanceService.checkIn(userId, cleanIp, notes || '');
 
       sendSuccess(res, {
-        data: attendance,
-        warnings,
-        message: warnings.length > 0
-          ? 'Checked in (with warnings)'
-          : 'Checked in successfully',
+        data: sanitize(attendance, req.user.role),
+        message: 'Checked in successfully',
       }, 201);
     } catch (error) {
       next(error);
@@ -35,7 +42,7 @@ class AttendanceController {
   async checkOut(req, res, next) {
     try {
       const attendance = await attendanceService.checkOut((req.user.id || req.user._id), req.body.notes);
-      sendSuccess(res, { data: attendance, message: 'Checked out successfully' });
+      sendSuccess(res, { data: sanitize(attendance, req.user.role), message: 'Checked out successfully' });
     } catch (error) {
       next(error);
     }
@@ -44,7 +51,7 @@ class AttendanceController {
   async getToday(req, res, next) {
     try {
       const attendance = await attendanceService.getToday((req.user.id || req.user._id));
-      sendSuccess(res, { data: attendance });
+      sendSuccess(res, { data: attendance ? sanitize(attendance, req.user.role) : null });
     } catch (error) {
       next(error);
     }
@@ -54,7 +61,7 @@ class AttendanceController {
     try {
       const query = req.validQuery || req.query;
       const { records, meta } = await attendanceService.getAll(query, (req.user.id || req.user._id), req.user.role);
-      sendSuccess(res, { data: records, meta });
+      sendSuccess(res, { data: sanitizeMany(records, req.user.role), meta });
     } catch (error) {
       next(error);
     }
@@ -67,6 +74,13 @@ class AttendanceController {
         : (req.user.id || req.user._id);
       const month = req.query.month || new Date().toISOString().slice(0, 7);
       const summary = await attendanceService.getMonthlySummary(userId, month);
+
+      // Strip suspicious info for non-admins
+      if (req.user.role !== 'super_admin') {
+        summary.suspiciousDays = undefined;
+        summary.records = sanitizeMany(summary.records, req.user.role);
+      }
+
       sendSuccess(res, { data: summary });
     } catch (error) {
       next(error);

@@ -2,8 +2,8 @@ import Attendance from './attendance.model.js';
 import User from '../users/user.model.js';
 import { AppError, buildPaginationMeta } from '../../utils/index.js';
 
-const OFFICE_NETWORK = process.env.OFFICE_NETWORK_NAME || 'AIB_Innovations';
 const OFFICE_SUBNET = process.env.OFFICE_SUBNET || '192.168.29';
+const OFFICE_PUBLIC_IPS = (process.env.OFFICE_PUBLIC_IPS || '').split(',').map((s) => s.trim()).filter(Boolean);
 
 class AttendanceService {
   /**
@@ -20,32 +20,31 @@ class AttendanceService {
     }
 
     // Determine suspicion based on IP
-    const warnings = [];
     let isSuspicious = false;
     let suspiciousReason = '';
 
-    // Check registered IPs
     const user = await User.findById(userId).select('registeredIps');
-    const isKnownIp = user?.registeredIps?.includes(ip);
+    const isFirstCheckIn = !user?.registeredIps?.length;
 
-    if (!isKnownIp && user?.registeredIps?.length > 0) {
-      isSuspicious = true;
-      suspiciousReason = `Unregistered IP: ${ip}`;
-      warnings.push(`You are checking in from an unregistered IP address (${ip}). This has been flagged.`);
-    }
-
-    // Auto-register first IP
-    if (!user?.registeredIps?.length) {
+    // Auto-register first IP — first time is always trusted
+    if (isFirstCheckIn) {
       await User.updateOne({ _id: userId }, { $addToSet: { registeredIps: ip } });
-    }
+    } else {
+      // Check if IP is known (registered) for this user
+      const isKnownIp = user.registeredIps.includes(ip);
 
-    // Check if IP is on office subnet (for local network detection)
-    const isOfficeSubnet = ip.startsWith(OFFICE_SUBNET + '.') || ip === '127.0.0.1';
-    if (!isOfficeSubnet && !isSuspicious) {
-      // Not on office subnet — flag as different network
-      isSuspicious = true;
-      suspiciousReason = `Outside office network (IP: ${ip})`;
-      warnings.push('You appear to be on a different network. Attendance marked as suspicious.');
+      // Check if IP is on office network (local subnet or known public IPs)
+      const isOfficeNetwork = ip.startsWith(OFFICE_SUBNET + '.')
+        || ip === '127.0.0.1'
+        || OFFICE_PUBLIC_IPS.includes(ip);
+
+      if (!isKnownIp && !isOfficeNetwork) {
+        isSuspicious = true;
+        suspiciousReason = `Unregistered IP outside office network: ${ip}`;
+      } else if (!isKnownIp) {
+        // New IP but on office network — auto-register it
+        await User.updateOne({ _id: userId }, { $addToSet: { registeredIps: ip } });
+      }
     }
 
     const doc = {
@@ -61,7 +60,7 @@ class AttendanceService {
 
     const attendance = await Attendance.create(doc);
 
-    return { attendance, warnings };
+    return attendance;
   }
 
   /**
