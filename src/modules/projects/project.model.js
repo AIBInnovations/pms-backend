@@ -41,11 +41,12 @@ const projectSchema = new mongoose.Schema(
       default: 0,
       min: 0,
     },
-    projectManager: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'User',
-      required: [true, 'Project manager is required'],
-    },
+    projectManagers: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User',
+      },
+    ],
     developers: [
       {
         type: mongoose.Schema.Types.ObjectId,
@@ -101,7 +102,7 @@ projectSchema.methods.toJSON = function () {
 
 // Indexes
 projectSchema.index({ status: 1 });
-projectSchema.index({ projectManager: 1 });
+projectSchema.index({ projectManagers: 1 });
 projectSchema.index({ developers: 1 });
 projectSchema.index({ createdBy: 1 });
 projectSchema.index({ domains: 1 });

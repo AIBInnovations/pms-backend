@@ -25,9 +25,9 @@ class ProjectService {
 
     // Scoped access: non-admins only see their projects
     if (userRole === 'developer') {
-      conditions.push({ $or: [{ developers: userId }, { projectManager: userId }] });
+      conditions.push({ $or: [{ developers: userId }, { projectManagers: userId }] });
     } else if (userRole === 'project_manager') {
-      conditions.push({ $or: [{ projectManager: userId }, { developers: userId }, { createdBy: userId }] });
+      conditions.push({ $or: [{ projectManagers: userId }, { developers: userId }, { createdBy: userId }] });
     }
 
     const filter = conditions.length > 0 ? { $and: conditions } : {};
@@ -37,7 +37,7 @@ class ProjectService {
 
     const [projects, total] = await Promise.all([
       Project.find(filter)
-        .populate('projectManager', 'name email avatar')
+        .populate('projectManagers', 'name email avatar')
         .populate('developers', 'name email avatar')
         .sort(sort)
         .skip(skip)
@@ -50,7 +50,7 @@ class ProjectService {
 
   async getById(id, userId, userRole) {
     const project = await Project.findById(id)
-      .populate('projectManager', 'name email avatar designation')
+      .populate('projectManagers', 'name email avatar designation')
       .populate('developers', 'name email avatar designation')
       .populate('createdBy', 'name email');
 
@@ -61,7 +61,7 @@ class ProjectService {
     // Access check for non-admins
     if (userRole !== 'super_admin') {
       const isMember =
-        project.projectManager?._id.toString() === userId ||
+        project.projectManagers?.some((pm) => pm._id.toString() === userId) ||
         project.developers.some((d) => d._id.toString() === userId) ||
         project.createdBy?._id.toString() === userId;
       if (!isMember) {
@@ -75,30 +75,30 @@ class ProjectService {
   async create(data, userId) {
     const project = await Project.create({ ...data, createdBy: userId });
     return Project.findById(project._id)
-      .populate('projectManager', 'name email avatar')
+      .populate('projectManagers', 'name email avatar')
       .populate('developers', 'name email avatar');
   }
 
   async update(id, data) {
     // Get old project to detect removed team members
-    const oldProject = await Project.findById(id).select('projectManager developers');
+    const oldProject = await Project.findById(id).select('projectManagers developers');
     if (!oldProject) {
       throw new AppError('Project not found', 404, 'NOT_FOUND');
     }
 
     const project = await Project.findByIdAndUpdate(id, data, { new: true, runValidators: true })
-      .populate('projectManager', 'name email avatar')
+      .populate('projectManagers', 'name email avatar')
       .populate('developers', 'name email avatar');
 
     // Unassign removed members from all tasks in this project
-    if (data.developers !== undefined || data.projectManager !== undefined) {
+    if (data.developers !== undefined || data.projectManagers !== undefined) {
       const oldTeam = new Set([
-        oldProject.projectManager?.toString(),
+        ...(oldProject.projectManagers || []).map((pm) => pm.toString()),
         ...oldProject.developers.map((d) => d.toString()),
       ].filter(Boolean));
 
       const newTeam = new Set([
-        (data.projectManager || project.projectManager?._id)?.toString(),
+        ...(data.projectManagers || project.projectManagers?.map((pm) => pm._id) || []).map((id) => id.toString()),
         ...(data.developers || project.developers.map((d) => d._id)).map((d) => d.toString()),
       ].filter(Boolean));
 
@@ -125,7 +125,7 @@ class ProjectService {
 
   async getTeamMembers(projectId) {
     const project = await Project.findById(projectId)
-      .populate('projectManager', 'name email avatar designation role')
+      .populate('projectManagers', 'name email avatar designation role')
       .populate('developers', 'name email avatar designation role');
 
     if (!project) {
@@ -133,8 +133,8 @@ class ProjectService {
     }
 
     const members = [];
-    if (project.projectManager) {
-      members.push({ ...project.projectManager.toObject(), projectRole: 'project_manager' });
+    for (const pm of (project.projectManagers || [])) {
+      members.push({ ...pm.toObject(), projectRole: 'project_manager' });
     }
     for (const dev of project.developers) {
       members.push({ ...dev.toObject(), projectRole: 'developer' });

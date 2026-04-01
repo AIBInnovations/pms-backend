@@ -33,8 +33,8 @@ class TaskService {
     // Scoped access: non-admins only see tasks from their projects
     if (userId && userRole && userRole !== 'super_admin') {
       const projectFilter = userRole === 'developer'
-        ? { $or: [{ developers: userId }, { projectManager: userId }] }
-        : { $or: [{ projectManager: userId }, { developers: userId }, { createdBy: userId }] };
+        ? { $or: [{ developers: userId }, { projectManagers: userId }] }
+        : { $or: [{ projectManagers: userId }, { developers: userId }, { createdBy: userId }] };
       const accessibleProjectIds = await Project.find(projectFilter).distinct('_id');
       filter.project = filter.project
         ? { $in: accessibleProjectIds.filter((pid) => pid.toString() === filter.project) }
@@ -61,7 +61,7 @@ class TaskService {
     const task = await Task.findById(id)
       .populate('assignees', 'name email avatar designation')
       .populate('watchers', 'name email avatar')
-      .populate('project', 'code name projectManager developers')
+      .populate('project', 'code name projectManagers developers')
       .populate('parentTask', 'taskId title stage')
       .populate('dependencies', 'taskId title stage')
       .populate('milestone', 'title status dueDate')
@@ -88,7 +88,7 @@ class TaskService {
     // Validate assignees are part of the project team
     if (data.assignees?.length) {
       const teamIds = [
-        project.projectManager.toString(),
+        ...(project.projectManagers || []).map((pm) => pm.toString()),
         ...project.developers.map((d) => d.toString()),
       ];
       const invalidAssignees = data.assignees.filter((a) => !teamIds.includes(a));
@@ -116,7 +116,7 @@ class TaskService {
 
       const project = await Project.findById(task.project);
       const teamIds = [
-        project.projectManager.toString(),
+        ...(project.projectManagers || []).map((pm) => pm.toString()),
         ...project.developers.map((d) => d.toString()),
       ];
       const invalidAssignees = data.assignees.filter((a) => !teamIds.includes(a));
