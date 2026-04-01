@@ -48,15 +48,18 @@ class AttendanceService {
       warnings.push('You appear to be on a different network. Attendance marked as suspicious.');
     }
 
-    const attendance = await Attendance.create({
+    const doc = {
       user: userId,
       date: today,
       checkIn: new Date(),
-      ip,
+      ip: ip || 'unknown',
       isSuspicious,
       suspiciousReason,
-      notes,
-    });
+      notes: notes || '',
+    };
+    console.log('[Attendance] Creating doc:', JSON.stringify(doc));
+
+    const attendance = await Attendance.create(doc);
 
     return { attendance, warnings };
   }
