@@ -14,10 +14,10 @@ class AttendanceController {
       const cleanIp = ip.replace(/^::ffff:/, '');
       const { notes } = req.body;
 
-      console.log('[Attendance] checkIn attempt:', { userId: req.user._id, ip: cleanIp, headers: { xff: req.headers['x-forwarded-for'], xri: req.headers['x-real-ip'] } });
+      const userId = req.user.id || (req.user.id || req.user._id);
 
       const { attendance, warnings } = await attendanceService.checkIn(
-        req.user._id, cleanIp, notes || ''
+        userId, cleanIp, notes || ''
       );
 
       sendSuccess(res, {
@@ -34,7 +34,7 @@ class AttendanceController {
 
   async checkOut(req, res, next) {
     try {
-      const attendance = await attendanceService.checkOut(req.user._id, req.body.notes);
+      const attendance = await attendanceService.checkOut((req.user.id || req.user._id), req.body.notes);
       sendSuccess(res, { data: attendance, message: 'Checked out successfully' });
     } catch (error) {
       next(error);
@@ -43,7 +43,7 @@ class AttendanceController {
 
   async getToday(req, res, next) {
     try {
-      const attendance = await attendanceService.getToday(req.user._id);
+      const attendance = await attendanceService.getToday((req.user.id || req.user._id));
       sendSuccess(res, { data: attendance });
     } catch (error) {
       next(error);
@@ -53,7 +53,7 @@ class AttendanceController {
   async getAll(req, res, next) {
     try {
       const query = req.validQuery || req.query;
-      const { records, meta } = await attendanceService.getAll(query, req.user._id, req.user.role);
+      const { records, meta } = await attendanceService.getAll(query, (req.user.id || req.user._id), req.user.role);
       sendSuccess(res, { data: records, meta });
     } catch (error) {
       next(error);
@@ -64,7 +64,7 @@ class AttendanceController {
     try {
       const userId = req.query.userId && req.user.role === 'super_admin'
         ? req.query.userId
-        : req.user._id;
+        : (req.user.id || req.user._id);
       const month = req.query.month || new Date().toISOString().slice(0, 7);
       const summary = await attendanceService.getMonthlySummary(userId, month);
       sendSuccess(res, { data: summary });
