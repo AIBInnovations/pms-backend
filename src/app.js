@@ -23,6 +23,9 @@ import attendanceRoutes from './modules/attendance/attendance.routes.js';
 
 const app = express();
 
+// Trust proxy (Render/Vercel) so req.ip returns the real client IP
+app.set('trust proxy', true);
+
 // Security
 app.use(helmet({
   contentSecurityPolicy: {
