@@ -16,6 +16,7 @@ router.get('/', validate(attendanceQuerySchema, 'query'), controller.getAll.bind
 
 // Admin only
 router.get('/today-all', rbac('super_admin'), controller.getTodayAll.bind(controller));
+router.get('/all-users-summary', rbac('super_admin'), controller.getAllUsersSummary.bind(controller));
 router.post('/register-ip', rbac('super_admin'), validate(registerIpSchema), controller.registerIp.bind(controller));
 router.delete('/ip/:userId/:ip', rbac('super_admin'), controller.removeIp.bind(controller));
 

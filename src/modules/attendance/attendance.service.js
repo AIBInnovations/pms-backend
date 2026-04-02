@@ -157,6 +157,50 @@ class AttendanceService {
   }
 
   /**
+   * Get monthly summary for all users (admin)
+   */
+  async getAllUsersSummary(month) {
+    const records = await Attendance.find({
+      date: { $regex: `^${month}` },
+    })
+      .populate('user', 'name email avatar role')
+      .sort({ date: 1 });
+
+    // Group by user
+    const userMap = new Map();
+    for (const r of records) {
+      const uid = r.user?._id?.toString();
+      if (!uid) continue;
+      if (!userMap.has(uid)) {
+        userMap.set(uid, {
+          user: r.user,
+          presentDays: 0,
+          totalHours: 0,
+          suspiciousDays: 0,
+          avgHours: 0,
+        });
+      }
+      const entry = userMap.get(uid);
+      entry.presentDays++;
+      if (r.isSuspicious) entry.suspiciousDays++;
+      if (r.checkIn && r.checkOut) {
+        entry.totalHours += (r.checkOut - r.checkIn) / (1000 * 60 * 60);
+      }
+    }
+
+    const summaries = Array.from(userMap.values()).map((s) => ({
+      ...s,
+      totalHours: Math.round(s.totalHours * 100) / 100,
+      avgHours: s.presentDays > 0 ? Math.round((s.totalHours / s.presentDays) * 100) / 100 : 0,
+    }));
+
+    // Sort by present days desc
+    summaries.sort((a, b) => b.presentDays - a.presentDays);
+
+    return summaries;
+  }
+
+  /**
    * Register an IP for a user (admin only)
    */
   async registerIp(targetUserId, ip) {

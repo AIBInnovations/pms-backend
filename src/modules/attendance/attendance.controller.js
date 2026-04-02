@@ -96,6 +96,16 @@ class AttendanceController {
     }
   }
 
+  async getAllUsersSummary(req, res, next) {
+    try {
+      const month = req.query.month || new Date().toISOString().slice(0, 7);
+      const summaries = await attendanceService.getAllUsersSummary(month);
+      sendSuccess(res, { data: summaries });
+    } catch (error) {
+      next(error);
+    }
+  }
+
   async registerIp(req, res, next) {
     try {
       const user = await attendanceService.registerIp(req.body.userId, req.body.ip);
