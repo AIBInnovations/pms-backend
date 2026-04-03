@@ -1,10 +1,7 @@
 import multer from 'multer';
 import { v2 as cloudinary } from 'cloudinary';
-import { CloudinaryStorage } from 'multer-storage-cloudinary';
 import { AppError } from '../utils/index.js';
-import { uploadToDrive } from '../utils/gdrive.js';
 
-// ─── Cloudinary (images only) ────────────────────────
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
   api_key: process.env.CLOUDINARY_API_KEY,
@@ -13,19 +10,6 @@ cloudinary.config({
 
 const IMAGE_MIMES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/svg+xml'];
 
-const cloudinaryStorage = new CloudinaryStorage({
-  cloudinary,
-  params: {
-    folder: 'pms-attachments',
-    allowed_formats: ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'],
-    resource_type: 'image',
-  },
-});
-
-// ─── Multer with memory storage (for Drive uploads) ──
-const memoryStorage = multer.memoryStorage();
-
-// File filter — accept all common types
 const ALLOWED_MIMES = [
   ...IMAGE_MIMES,
   'application/pdf',
@@ -35,9 +19,9 @@ const ALLOWED_MIMES = [
   'text/plain', 'text/csv', 'text/markdown',
   'application/json',
   'application/zip', 'application/x-rar-compressed', 'application/gzip',
-  'application/vnd.android.package-archive', // APK
+  'application/vnd.android.package-archive',
   'video/mp4', 'video/quicktime', 'video/webm',
-  'application/octet-stream', // generic binary (exe, etc)
+  'application/octet-stream',
 ];
 
 const fileFilter = (req, file, cb) => {
@@ -48,57 +32,33 @@ const fileFilter = (req, file, cb) => {
   }
 };
 
-// Image upload → Cloudinary
-export const uploadImage = multer({
-  storage: cloudinaryStorage,
-  fileFilter: (req, file, cb) => {
-    if (IMAGE_MIMES.includes(file.mimetype)) cb(null, true);
-    else cb(new AppError('Only images allowed', 400, 'INVALID_FILE_TYPE'), false);
-  },
-  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB
-});
-
-// Any file upload → memory buffer (then routed to Cloudinary or Drive)
 export const upload = multer({
-  storage: memoryStorage,
+  storage: multer.memoryStorage(),
   fileFilter,
   limits: { fileSize: 100 * 1024 * 1024 }, // 100MB
 });
 
 /**
- * After multer processes the file into memory, this middleware
- * routes it to Cloudinary (images) or Google Drive (everything else)
- * and sets file.cloudUrl with the final URL.
+ * Upload to Cloudinary — images as 'image', everything else as 'raw'.
+ * Cloudinary supports any file type with resource_type: 'raw'.
  */
 export async function routeUpload(req, res, next) {
   if (!req.file) return next();
 
   try {
     const isImage = IMAGE_MIMES.includes(req.file.mimetype);
+    const resourceType = isImage ? 'image' : 'raw';
+    const folder = isImage ? 'pms-attachments' : 'pms-files';
 
-    if (isImage) {
-      // Upload to Cloudinary
-      const result = await new Promise((resolve, reject) => {
-        const stream = cloudinary.uploader.upload_stream(
-          { folder: 'pms-attachments', resource_type: 'image' },
-          (err, result) => err ? reject(err) : resolve(result)
-        );
-        stream.end(req.file.buffer);
-      });
-      req.file.cloudUrl = result.secure_url;
-      req.file.storageType = 'cloudinary';
-    } else {
-      // Upload to Google Drive
-      const { url, driveFileId } = await uploadToDrive(
-        req.file.buffer,
-        req.file.originalname,
-        req.file.mimetype
+    const result = await new Promise((resolve, reject) => {
+      const stream = cloudinary.uploader.upload_stream(
+        { folder, resource_type: resourceType, public_id: `${Date.now()}-${req.file.originalname.replace(/[^a-zA-Z0-9._-]/g, '_')}` },
+        (err, result) => err ? reject(err) : resolve(result)
       );
-      req.file.cloudUrl = url;
-      req.file.driveFileId = driveFileId;
-      req.file.storageType = 'drive';
-    }
+      stream.end(req.file.buffer);
+    });
 
+    req.file.cloudUrl = result.secure_url;
     next();
   } catch (err) {
     console.error('[Upload] Failed:', err.message);

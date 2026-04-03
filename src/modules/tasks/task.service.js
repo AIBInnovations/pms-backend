@@ -3,7 +3,6 @@ import Task from './task.model.js';
 import Project from '../projects/project.model.js';
 import { AppError, buildPaginationMeta } from '../../utils/index.js';
 import { cloudinary } from '../../middleware/upload.js';
-import { deleteFromDrive, extractDriveFileId } from '../../utils/gdrive.js';
 
 const STAGE_ORDER = ['backlog', 'todo', 'in_progress', 'in_review', 'testing', 'done', 'archived'];
 
@@ -320,20 +319,16 @@ class TaskService {
     const attachment = task.attachments.id(attachmentId);
     if (!attachment) throw new AppError('Attachment not found', 404, 'NOT_FOUND');
 
-    // Delete from cloud storage
-    try {
-      if (attachment.url?.includes('cloudinary.com')) {
+    // Delete from Cloudinary
+    if (attachment.url?.includes('cloudinary.com')) {
+      try {
         const parts = attachment.url.split('/');
         const folder = parts[parts.length - 2];
         const fileWithExt = parts[parts.length - 1];
         const publicId = `${folder}/${fileWithExt.split('.')[0]}`;
-        await cloudinary.uploader.destroy(publicId);
-      } else if (attachment.url?.includes('drive.google.com')) {
-        const fileId = extractDriveFileId(attachment.url);
-        if (fileId) await deleteFromDrive(fileId);
-      }
-    } catch {
-      // Don't block deletion if cloud cleanup fails
+        const isRaw = attachment.url.includes('/raw/');
+        await cloudinary.uploader.destroy(publicId, { resource_type: isRaw ? 'raw' : 'image' });
+      } catch { /* don't block */ }
     }
 
     attachment.deleteOne();
