@@ -11,19 +11,22 @@ async function getDrive() {
 
   let credentials;
   if (process.env.GOOGLE_CREDENTIALS_JSON) {
-    // Full JSON credentials as a single env var
     credentials = JSON.parse(process.env.GOOGLE_CREDENTIALS_JSON);
   } else {
-    // Fallback to separate env vars
-    const rawKey = process.env.GOOGLE_PRIVATE_KEY || '';
     credentials = {
       client_email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
-      private_key: rawKey.includes('\\n') ? rawKey.replace(/\\n/g, '\n') : rawKey,
+      private_key: process.env.GOOGLE_PRIVATE_KEY || '',
     };
+  }
+
+  // Ensure private_key has real newlines (not escaped \\n)
+  if (credentials.private_key) {
+    credentials.private_key = credentials.private_key.replace(/\\n/g, '\n');
   }
 
   console.log('[GDrive] Email:', credentials.client_email ? 'set' : 'MISSING');
   console.log('[GDrive] Key length:', credentials.private_key?.length || 0);
+  console.log('[GDrive] Key has real newlines:', credentials.private_key?.includes('\n'));
 
   authClient = new google.auth.JWT(
     credentials.client_email,
