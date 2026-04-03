@@ -58,6 +58,36 @@ class ProjectController {
     }
   }
 
+  // ─── Revenues ───────────────────────────────────────
+
+  async getRevenues(req, res, next) {
+    try {
+      const revenues = await projectService.getRevenues(req.params.id);
+      sendSuccess(res, { data: revenues });
+    } catch (error) { next(error); }
+  }
+
+  async addRevenue(req, res, next) {
+    try {
+      const revenue = await projectService.addRevenue(req.params.id, req.body);
+      sendSuccess(res, { data: revenue, message: 'Revenue added' }, 201);
+    } catch (error) { next(error); }
+  }
+
+  async updateRevenue(req, res, next) {
+    try {
+      const revenue = await projectService.updateRevenue(req.params.id, req.params.revenueId, req.body);
+      sendSuccess(res, { data: revenue, message: 'Revenue updated' });
+    } catch (error) { next(error); }
+  }
+
+  async removeRevenue(req, res, next) {
+    try {
+      await projectService.removeRevenue(req.params.id, req.params.revenueId);
+      sendSuccess(res, { message: 'Revenue removed' });
+    } catch (error) { next(error); }
+  }
+
   // ─── Milestones ──────────────────────────────────────
 
   async getMilestones(req, res, next) {

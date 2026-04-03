@@ -142,6 +142,42 @@ class ProjectService {
     return members;
   }
 
+  // ─── Revenues ───────────────────────────────────────
+
+  async getRevenues(projectId) {
+    const project = await Project.findById(projectId).select('revenues');
+    if (!project) throw new AppError('Project not found', 404, 'NOT_FOUND');
+    return project.revenues || [];
+  }
+
+  async addRevenue(projectId, data) {
+    const project = await Project.findById(projectId);
+    if (!project) throw new AppError('Project not found', 404, 'NOT_FOUND');
+    project.revenues.push(data);
+    await project.save();
+    return project.revenues[project.revenues.length - 1];
+  }
+
+  async updateRevenue(projectId, revenueId, data) {
+    const project = await Project.findById(projectId);
+    if (!project) throw new AppError('Project not found', 404, 'NOT_FOUND');
+    const rev = project.revenues.id(revenueId);
+    if (!rev) throw new AppError('Revenue entry not found', 404, 'NOT_FOUND');
+    Object.assign(rev, data);
+    await project.save();
+    return rev;
+  }
+
+  async removeRevenue(projectId, revenueId) {
+    const project = await Project.findById(projectId);
+    if (!project) throw new AppError('Project not found', 404, 'NOT_FOUND');
+    const rev = project.revenues.id(revenueId);
+    if (!rev) throw new AppError('Revenue entry not found', 404, 'NOT_FOUND');
+    rev.deleteOne();
+    await project.save();
+    return { message: 'Revenue entry removed' };
+  }
+
   // ─── Milestones ──────────────────────────────────────
 
   async getMilestones(projectId) {

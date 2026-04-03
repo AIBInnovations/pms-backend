@@ -63,4 +63,10 @@ router.delete(
   projectController.deleteMilestone.bind(projectController)
 );
 
+// Revenues (admin only)
+router.get('/:id/revenues', rbac('super_admin'), projectController.getRevenues.bind(projectController));
+router.post('/:id/revenues', rbac('super_admin'), projectController.addRevenue.bind(projectController));
+router.patch('/:id/revenues/:revenueId', rbac('super_admin'), projectController.updateRevenue.bind(projectController));
+router.delete('/:id/revenues/:revenueId', rbac('super_admin'), projectController.removeRevenue.bind(projectController));
+
 export default router;

@@ -70,6 +70,19 @@ const projectSchema = new mongoose.Schema(
         ],
       },
     ],
+    revenues: [
+      {
+        category: {
+          type: String,
+          enum: ['development', 'maintenance', 'custom'],
+          required: true,
+        },
+        customLabel: { type: String, trim: true, default: '' },
+        amount: { type: Number, required: true, min: 0 },
+        date: { type: Date, default: Date.now },
+        notes: { type: String, trim: true, default: '' },
+      },
+    ],
     stageRestrictions: {
       type: Map,
       of: [String],
