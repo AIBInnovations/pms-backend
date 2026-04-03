@@ -4,7 +4,6 @@ import { Readable } from 'stream';
 const SCOPES = ['https://www.googleapis.com/auth/drive.file'];
 
 let driveClient = null;
-let authClient = null;
 
 async function getDrive() {
   if (driveClient) return driveClient;
@@ -19,26 +18,22 @@ async function getDrive() {
     };
   }
 
-  // Ensure private_key has real newlines (not escaped \\n)
   if (credentials.private_key) {
     credentials.private_key = credentials.private_key.replace(/\\n/g, '\n');
   }
 
-  console.log('[GDrive] Email:', credentials.client_email ? 'set' : 'MISSING');
-  console.log('[GDrive] Key length:', credentials.private_key?.length || 0);
-  console.log('[GDrive] Key has real newlines:', credentials.private_key?.includes('\n'));
+  const auth = new google.auth.GoogleAuth({
+    credentials: {
+      client_email: credentials.client_email,
+      private_key: credentials.private_key,
+    },
+    scopes: SCOPES,
+  });
 
-  authClient = new google.auth.JWT(
-    credentials.client_email,
-    null,
-    credentials.private_key,
-    SCOPES
-  );
-
-  await authClient.authorize();
+  const client = await auth.getClient();
   console.log('[GDrive] Authorized successfully');
 
-  driveClient = google.drive({ version: 'v3', auth: authClient });
+  driveClient = google.drive({ version: 'v3', auth: client });
   return driveClient;
 }
 
