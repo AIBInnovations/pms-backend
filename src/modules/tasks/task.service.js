@@ -300,7 +300,7 @@ class TaskService {
     return task.attachments[task.attachments.length - 1];
   }
 
-  async saveAnnotatedImage(taskId, base64Image, name, userId) {
+  async saveAnnotatedImage(taskId, base64Image, attachmentId, userId) {
     const task = await Task.findById(taskId);
     if (!task) throw new AppError('Task not found', 404, 'NOT_FOUND');
 
@@ -309,8 +309,29 @@ class TaskService {
       resource_type: 'image',
     });
 
+    // Replace existing attachment if attachmentId provided
+    if (attachmentId) {
+      const attachment = task.attachments.id(attachmentId);
+      if (attachment) {
+        // Delete old image from Cloudinary
+        if (attachment.url?.includes('cloudinary.com')) {
+          try {
+            const parts = attachment.url.split('/');
+            const folder = parts[parts.length - 2];
+            const fileWithExt = parts[parts.length - 1];
+            const publicId = `${folder}/${fileWithExt.split('.')[0]}`;
+            await cloudinary.uploader.destroy(publicId);
+          } catch { /* ignore */ }
+        }
+        attachment.url = result.secure_url;
+        await task.save();
+        return attachment;
+      }
+    }
+
+    // Fallback: add as new attachment
     task.attachments.push({
-      name,
+      name: 'annotated-image.jpg',
       url: result.secure_url,
       uploadedBy: userId,
     });
