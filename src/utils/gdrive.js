@@ -4,26 +4,26 @@ import { Readable } from 'stream';
 const SCOPES = ['https://www.googleapis.com/auth/drive.file'];
 
 let driveClient = null;
+let authClient = null;
 
-function getDrive() {
+async function getDrive() {
   if (driveClient) return driveClient;
 
   const rawKey = process.env.GOOGLE_PRIVATE_KEY || '';
-  // Handle both escaped \\n and literal \n from different env var sources
   const privateKey = rawKey.includes('\\n') ? rawKey.replace(/\\n/g, '\n') : rawKey;
 
-  console.log('[GDrive] Email:', process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL ? 'set' : 'MISSING');
-  console.log('[GDrive] Key starts with:', privateKey.substring(0, 30));
-  console.log('[GDrive] Folder:', process.env.GOOGLE_DRIVE_FOLDER_ID ? 'set' : 'MISSING');
-
-  const auth = new google.auth.JWT(
+  authClient = new google.auth.JWT(
     process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
     null,
     privateKey,
     SCOPES
   );
 
-  driveClient = google.drive({ version: 'v3', auth });
+  // Explicitly authorize to get the access token
+  await authClient.authorize();
+  console.log('[GDrive] Authorized successfully');
+
+  driveClient = google.drive({ version: 'v3', auth: authClient });
   return driveClient;
 }
 
@@ -35,17 +35,8 @@ function getDrive() {
  * @returns {{ url: string, driveFileId: string }}
  */
 export async function uploadToDrive(buffer, filename, mimeType) {
-  const drive = getDrive();
+  const drive = await getDrive();
   const folderId = process.env.GOOGLE_DRIVE_FOLDER_ID;
-
-  // Test auth explicitly
-  try {
-    await drive.about.get({ fields: 'user' });
-    console.log('[GDrive] Auth successful');
-  } catch (authErr) {
-    console.error('[GDrive] Auth failed:', authErr.message, authErr.response?.data?.error);
-    throw authErr;
-  }
 
   const res = await drive.files.create({
     requestBody: {
@@ -79,7 +70,7 @@ export async function uploadToDrive(buffer, filename, mimeType) {
  * @param {string} fileId - Google Drive file ID
  */
 export async function deleteFromDrive(fileId) {
-  const drive = getDrive();
+  const drive = await getDrive();
   await drive.files.delete({ fileId });
 }
 
