@@ -2,6 +2,7 @@ import mongoose from 'mongoose';
 import Task from './task.model.js';
 import Project from '../projects/project.model.js';
 import { AppError, buildPaginationMeta } from '../../utils/index.js';
+import { cloudinary } from '../../middleware/upload.js';
 
 const STAGE_ORDER = ['backlog', 'todo', 'in_progress', 'in_review', 'testing', 'done', 'archived'];
 
@@ -303,10 +304,10 @@ class TaskService {
     const task = await Task.findById(taskId);
     if (!task) throw new AppError('Task not found', 404, 'NOT_FOUND');
 
-    const { cloudinary } = await import('../../middleware/upload.js');
     const result = await cloudinary.uploader.upload(base64Image, {
-      folder: 'pms-attachments',
+      folder: 'pms-annotations',
       resource_type: 'image',
+      format: 'png',
     });
 
     task.attachments.push({
