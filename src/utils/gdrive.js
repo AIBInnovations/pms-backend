@@ -38,6 +38,15 @@ export async function uploadToDrive(buffer, filename, mimeType) {
   const drive = getDrive();
   const folderId = process.env.GOOGLE_DRIVE_FOLDER_ID;
 
+  // Test auth explicitly
+  try {
+    await drive.about.get({ fields: 'user' });
+    console.log('[GDrive] Auth successful');
+  } catch (authErr) {
+    console.error('[GDrive] Auth failed:', authErr.message, authErr.response?.data?.error);
+    throw authErr;
+  }
+
   const res = await drive.files.create({
     requestBody: {
       name: `${Date.now()}-${filename}`,
