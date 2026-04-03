@@ -326,6 +326,20 @@ class TaskService {
     const attachment = task.attachments.id(attachmentId);
     if (!attachment) throw new AppError('Attachment not found', 404, 'NOT_FOUND');
 
+    // Delete from Cloudinary if it's a Cloudinary URL
+    if (attachment.url?.includes('cloudinary.com')) {
+      try {
+        // Extract public_id from URL: .../pms-attachments/abc123.ext → pms-attachments/abc123
+        const parts = attachment.url.split('/');
+        const folder = parts[parts.length - 2];
+        const fileWithExt = parts[parts.length - 1];
+        const publicId = `${folder}/${fileWithExt.split('.')[0]}`;
+        await cloudinary.uploader.destroy(publicId);
+      } catch {
+        // Don't block deletion if Cloudinary cleanup fails
+      }
+    }
+
     attachment.deleteOne();
     await task.save();
     return { message: 'Attachment removed' };
