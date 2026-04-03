@@ -9,17 +9,29 @@ let authClient = null;
 async function getDrive() {
   if (driveClient) return driveClient;
 
-  const rawKey = process.env.GOOGLE_PRIVATE_KEY || '';
-  const privateKey = rawKey.includes('\\n') ? rawKey.replace(/\\n/g, '\n') : rawKey;
+  let credentials;
+  if (process.env.GOOGLE_CREDENTIALS_JSON) {
+    // Full JSON credentials as a single env var
+    credentials = JSON.parse(process.env.GOOGLE_CREDENTIALS_JSON);
+  } else {
+    // Fallback to separate env vars
+    const rawKey = process.env.GOOGLE_PRIVATE_KEY || '';
+    credentials = {
+      client_email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
+      private_key: rawKey.includes('\\n') ? rawKey.replace(/\\n/g, '\n') : rawKey,
+    };
+  }
+
+  console.log('[GDrive] Email:', credentials.client_email ? 'set' : 'MISSING');
+  console.log('[GDrive] Key length:', credentials.private_key?.length || 0);
 
   authClient = new google.auth.JWT(
-    process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
+    credentials.client_email,
     null,
-    privateKey,
+    credentials.private_key,
     SCOPES
   );
 
-  // Explicitly authorize to get the access token
   await authClient.authorize();
   console.log('[GDrive] Authorized successfully');
 
