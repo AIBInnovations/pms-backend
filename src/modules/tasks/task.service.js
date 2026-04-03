@@ -307,7 +307,6 @@ class TaskService {
     const result = await cloudinary.uploader.upload(base64Image, {
       folder: 'pms-annotations',
       resource_type: 'image',
-      format: 'png',
     });
 
     task.attachments.push({
