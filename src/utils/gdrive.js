@@ -58,6 +58,7 @@ export async function uploadToDrive(buffer, filename, mimeType) {
       body: Readable.from(buffer),
     },
     fields: 'id, webViewLink',
+    supportsAllDrives: true,
   });
 
   // Make file readable by anyone with the link
@@ -67,6 +68,7 @@ export async function uploadToDrive(buffer, filename, mimeType) {
       role: 'reader',
       type: 'anyone',
     },
+    supportsAllDrives: true,
   });
 
   return {
@@ -81,7 +83,7 @@ export async function uploadToDrive(buffer, filename, mimeType) {
  */
 export async function deleteFromDrive(fileId) {
   const drive = await getDrive();
-  await drive.files.delete({ fileId });
+  await drive.files.delete({ fileId, supportsAllDrives: true });
 }
 
 /**
