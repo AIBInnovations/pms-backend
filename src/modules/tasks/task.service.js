@@ -3,6 +3,7 @@ import Task from './task.model.js';
 import Project from '../projects/project.model.js';
 import { AppError, buildPaginationMeta } from '../../utils/index.js';
 import { cloudinary } from '../../middleware/upload.js';
+import { deleteFromDrive, extractDriveFileId } from '../../utils/gdrive.js';
 
 const STAGE_ORDER = ['backlog', 'todo', 'in_progress', 'in_review', 'testing', 'done', 'archived'];
 
@@ -288,8 +289,8 @@ class TaskService {
     const task = await Task.findById(taskId);
     if (!task) throw new AppError('Task not found', 404, 'NOT_FOUND');
 
-    // Cloudinary stores URL in file.path, local multer uses /uploads/filename
-    const url = file.path || `/uploads/${file.filename}`;
+    // cloudUrl is set by routeUpload middleware (Cloudinary or Drive)
+    const url = file.cloudUrl || file.path || `/uploads/${file.filename}`;
 
     task.attachments.push({
       name: file.originalname,
@@ -319,18 +320,20 @@ class TaskService {
     const attachment = task.attachments.id(attachmentId);
     if (!attachment) throw new AppError('Attachment not found', 404, 'NOT_FOUND');
 
-    // Delete from Cloudinary if it's a Cloudinary URL
-    if (attachment.url?.includes('cloudinary.com')) {
-      try {
-        // Extract public_id from URL: .../pms-attachments/abc123.ext → pms-attachments/abc123
+    // Delete from cloud storage
+    try {
+      if (attachment.url?.includes('cloudinary.com')) {
         const parts = attachment.url.split('/');
         const folder = parts[parts.length - 2];
         const fileWithExt = parts[parts.length - 1];
         const publicId = `${folder}/${fileWithExt.split('.')[0]}`;
         await cloudinary.uploader.destroy(publicId);
-      } catch {
-        // Don't block deletion if Cloudinary cleanup fails
+      } else if (attachment.url?.includes('drive.google.com')) {
+        const fileId = extractDriveFileId(attachment.url);
+        if (fileId) await deleteFromDrive(fileId);
       }
+    } catch {
+      // Don't block deletion if cloud cleanup fails
     }
 
     attachment.deleteOne();

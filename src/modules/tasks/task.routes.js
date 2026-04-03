@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import taskController from './task.controller.js';
-import { auth, validate, audit, upload } from '../../middleware/index.js';
+import { auth, validate, audit, upload, routeUpload } from '../../middleware/index.js';
 import {
   createTaskSchema,
   updateTaskSchema,
@@ -341,6 +341,7 @@ router.get('/:id/subtasks', taskController.getSubtasks.bind(taskController));
 router.post(
   '/:id/attachments',
   upload.single('file'),
+  routeUpload,
   audit('task'),
   taskController.addAttachment.bind(taskController)
 );
