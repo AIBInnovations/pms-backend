@@ -13,6 +13,7 @@ const attachmentSchema = new mongoose.Schema(
   {
     name: { type: String, required: true },
     url: { type: String, required: true },
+    annotations: { type: mongoose.Schema.Types.Mixed, default: null },
     uploadedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
     uploadedAt: { type: Date, default: Date.now },
   },

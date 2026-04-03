@@ -128,14 +128,14 @@ class TaskController {
     }
   }
 
-  async saveAnnotatedImage(req, res, next) {
+  async saveAnnotations(req, res, next) {
     try {
-      const { image, attachmentId } = req.body;
-      if (!image) {
-        return res.status(400).json({ success: false, error: { message: 'No image data' } });
+      const { attachmentId, annotations } = req.body;
+      if (!attachmentId || !annotations) {
+        return res.status(400).json({ success: false, error: { message: 'attachmentId and annotations required' } });
       }
-      const attachment = await taskService.saveAnnotatedImage(req.params.id, image, attachmentId, req.user.id);
-      sendSuccess(res, { data: attachment, message: 'Annotated image saved' }, 201);
+      const attachment = await taskService.saveAnnotations(req.params.id, attachmentId, annotations);
+      sendSuccess(res, { data: attachment, message: 'Annotations saved' });
     } catch (error) {
       next(error);
     }

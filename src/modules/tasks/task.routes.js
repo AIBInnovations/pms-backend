@@ -1,5 +1,4 @@
 import { Router } from 'express';
-import express from 'express';
 import taskController from './task.controller.js';
 import { auth, validate, audit, upload } from '../../middleware/index.js';
 import {
@@ -351,11 +350,10 @@ router.delete(
   taskController.removeAttachment.bind(taskController)
 );
 
-// Annotated image (larger body limit for base64)
+// Save annotations on an attachment
 router.post(
-  '/:id/annotated-image',
-  express.json({ limit: '50mb' }),
-  taskController.saveAnnotatedImage.bind(taskController)
+  '/:id/annotations',
+  taskController.saveAnnotations.bind(taskController)
 );
 
 // Bulk actions
