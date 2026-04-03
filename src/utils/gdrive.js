@@ -8,10 +8,18 @@ let driveClient = null;
 function getDrive() {
   if (driveClient) return driveClient;
 
+  const rawKey = process.env.GOOGLE_PRIVATE_KEY || '';
+  // Handle both escaped \\n and literal \n from different env var sources
+  const privateKey = rawKey.includes('\\n') ? rawKey.replace(/\\n/g, '\n') : rawKey;
+
+  console.log('[GDrive] Email:', process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL ? 'set' : 'MISSING');
+  console.log('[GDrive] Key starts with:', privateKey.substring(0, 30));
+  console.log('[GDrive] Folder:', process.env.GOOGLE_DRIVE_FOLDER_ID ? 'set' : 'MISSING');
+
   const auth = new google.auth.JWT(
     process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
     null,
-    (process.env.GOOGLE_PRIVATE_KEY || '').replace(/\\n/g, '\n'),
+    privateKey,
     SCOPES
   );
 
