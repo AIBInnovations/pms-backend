@@ -350,6 +350,12 @@ router.delete(
   taskController.removeAttachment.bind(taskController)
 );
 
+// Annotated image
+router.post(
+  '/:id/annotated-image',
+  taskController.saveAnnotatedImage.bind(taskController)
+);
+
 // Bulk actions
 router.post(
   '/bulk',

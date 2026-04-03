@@ -287,9 +287,31 @@ class TaskService {
     const task = await Task.findById(taskId);
     if (!task) throw new AppError('Task not found', 404, 'NOT_FOUND');
 
+    // Cloudinary stores URL in file.path, local multer uses /uploads/filename
+    const url = file.path || `/uploads/${file.filename}`;
+
     task.attachments.push({
       name: file.originalname,
-      url: `/uploads/${file.filename}`,
+      url,
+      uploadedBy: userId,
+    });
+    await task.save();
+    return task.attachments[task.attachments.length - 1];
+  }
+
+  async saveAnnotatedImage(taskId, base64Image, name, userId) {
+    const task = await Task.findById(taskId);
+    if (!task) throw new AppError('Task not found', 404, 'NOT_FOUND');
+
+    const { cloudinary } = await import('../../middleware/upload.js');
+    const result = await cloudinary.uploader.upload(base64Image, {
+      folder: 'pms-attachments',
+      resource_type: 'image',
+    });
+
+    task.attachments.push({
+      name,
+      url: result.secure_url,
       uploadedBy: userId,
     });
     await task.save();

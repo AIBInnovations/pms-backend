@@ -127,6 +127,19 @@ class TaskController {
       next(error);
     }
   }
+
+  async saveAnnotatedImage(req, res, next) {
+    try {
+      const { image, name } = req.body;
+      if (!image) {
+        return res.status(400).json({ success: false, error: { message: 'No image data' } });
+      }
+      const attachment = await taskService.saveAnnotatedImage(req.params.id, image, name || 'annotated.png', req.user.id);
+      sendSuccess(res, { data: attachment, message: 'Annotated image saved' }, 201);
+    } catch (error) {
+      next(error);
+    }
+  }
 }
 
 export default new TaskController();
