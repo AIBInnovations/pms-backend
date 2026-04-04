@@ -24,6 +24,18 @@ const documentSchema = new mongoose.Schema(
       type: String,
       default: '',
     },
+    fileUrl: {
+      type: String,
+      default: '',
+    },
+    fileName: {
+      type: String,
+      default: '',
+    },
+    fileType: {
+      type: String,
+      default: '',
+    },
     category: {
       type: String,
       enum: ['requirement', 'design', 'technical', 'meeting_notes', 'guide', 'other'],

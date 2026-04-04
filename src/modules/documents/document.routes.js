@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import documentController from './document.controller.js';
-import { auth, validate, audit } from '../../middleware/index.js';
+import { auth, validate, audit, upload, routeUpload } from '../../middleware/index.js';
 import {
   createDocumentSchema,
   updateDocumentSchema,
@@ -25,6 +25,15 @@ router.post(
   validate(createDocumentSchema),
   audit('documents'),
   documentController.create.bind(documentController)
+);
+
+// File upload as document
+router.post(
+  '/upload',
+  upload.single('file'),
+  routeUpload,
+  audit('documents'),
+  documentController.uploadFile.bind(documentController)
 );
 
 router.patch(
