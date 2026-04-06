@@ -19,7 +19,7 @@ export const updateDocumentSchema = Joi.object({
 
 export const documentQuerySchema = Joi.object({
   page: Joi.number().integer().min(1).default(1),
-  limit: Joi.number().integer().min(1).max(50).default(20),
+  limit: Joi.number().integer().min(1).max(200).default(20),
   project: objectId,
   category: Joi.string().valid('requirement', 'design', 'technical', 'meeting_notes', 'guide', 'other'),
   tag: Joi.string().trim(),
