@@ -28,4 +28,17 @@ router.post('/withdrawals', controller.addWithdrawal.bind(controller));
 router.patch('/withdrawals/:id', controller.updateWithdrawal.bind(controller));
 router.delete('/withdrawals/:id', controller.deleteWithdrawal.bind(controller));
 
+// Recurring Plans
+router.get('/recurring', controller.getRecurringPlans.bind(controller));
+router.post('/recurring', controller.addRecurringPlan.bind(controller));
+router.patch('/recurring/:id', controller.updateRecurringPlan.bind(controller));
+router.delete('/recurring/:id', controller.deleteRecurringPlan.bind(controller));
+
+// Invoices
+router.get('/invoices', controller.getInvoices.bind(controller));
+router.post('/invoices', controller.generateInvoice.bind(controller));
+router.patch('/invoices/:id', controller.updateInvoice.bind(controller));
+router.post('/invoices/:id/pay', controller.markInvoicePaid.bind(controller));
+router.delete('/invoices/:id', controller.deleteInvoice.bind(controller));
+
 export default router;

@@ -1,4 +1,4 @@
-import { Payment, Expense, Withdrawal } from './accounts.model.js';
+import { Payment, Expense, Withdrawal, RecurringPlan, Invoice } from './accounts.model.js';
 import { AppError } from '../../utils/index.js';
 
 class AccountsService {
@@ -168,6 +168,97 @@ class AccountsService {
   async deleteWithdrawal(id) {
     const doc = await Withdrawal.findByIdAndDelete(id);
     if (!doc) throw new AppError('Withdrawal not found', 404, 'NOT_FOUND');
+    return doc;
+  }
+
+  // ─── Recurring Plans ───────────────────────────────
+  async getRecurringPlans() {
+    return RecurringPlan.find()
+      .populate('project', 'name code status')
+      .sort({ status: 1, createdAt: -1 });
+  }
+
+  async addRecurringPlan(data, userId) {
+    return RecurringPlan.create({ ...data, createdBy: userId });
+  }
+
+  async updateRecurringPlan(id, data) {
+    const doc = await RecurringPlan.findByIdAndUpdate(id, data, { new: true, runValidators: true }).populate('project', 'name code status');
+    if (!doc) throw new AppError('Plan not found', 404, 'NOT_FOUND');
+    return doc;
+  }
+
+  async deleteRecurringPlan(id) {
+    const doc = await RecurringPlan.findByIdAndDelete(id);
+    if (!doc) throw new AppError('Plan not found', 404, 'NOT_FOUND');
+    // Also delete related invoices
+    await Invoice.deleteMany({ recurringPlan: id });
+    return doc;
+  }
+
+  // ─── Invoices ──────────────────────────────────────
+  async getInvoices(query = {}) {
+    const { project, recurringPlan, status, limit = 100 } = query;
+    const filter = {};
+    if (project) filter.project = project;
+    if (recurringPlan) filter.recurringPlan = recurringPlan;
+    if (status) filter.status = status;
+    return Invoice.find(filter)
+      .populate('project', 'name code')
+      .populate('recurringPlan')
+      .sort({ createdAt: -1 })
+      .limit(limit);
+  }
+
+  async generateInvoice(data, userId) {
+    // Check for duplicate period invoice on same plan
+    if (data.recurringPlan && data.period) {
+      const existing = await Invoice.findOne({ recurringPlan: data.recurringPlan, period: data.period });
+      if (existing) throw new AppError(`Invoice for ${data.period} already exists`, 400, 'DUPLICATE_INVOICE');
+    }
+    return Invoice.create({ ...data, createdBy: userId });
+  }
+
+  async updateInvoice(id, data) {
+    const doc = await Invoice.findByIdAndUpdate(id, data, { new: true, runValidators: true })
+      .populate('project', 'name code');
+    if (!doc) throw new AppError('Invoice not found', 404, 'NOT_FOUND');
+    return doc;
+  }
+
+  async markInvoicePaid(id, paymentData) {
+    const invoice = await Invoice.findById(id);
+    if (!invoice) throw new AppError('Invoice not found', 404, 'NOT_FOUND');
+
+    invoice.status = 'paid';
+    invoice.paidDate = paymentData.paidDate || new Date();
+    invoice.paidAmount = paymentData.paidAmount || invoice.amount;
+    invoice.paymentMethod = paymentData.paymentMethod || '';
+    invoice.paymentReference = paymentData.paymentReference || '';
+    await invoice.save();
+
+    // Also record as an incoming payment
+    await Payment.create({
+      project: invoice.project,
+      amount: invoice.paidAmount,
+      date: invoice.paidDate,
+      description: `Invoice ${invoice.invoiceNumber} — ${invoice.type === 'setup' ? 'Setup Fee' : invoice.period}`,
+      paymentMethod: invoice.paymentMethod || 'bank_transfer',
+      reference: invoice.paymentReference,
+      createdBy: paymentData.userId,
+    });
+
+    // If setup invoice, mark plan setupFeePaid
+    if (invoice.type === 'setup' && invoice.recurringPlan) {
+      await RecurringPlan.findByIdAndUpdate(invoice.recurringPlan, { setupFeePaid: true });
+    }
+
+    return Invoice.findById(id).populate('project', 'name code');
+  }
+
+  async deleteInvoice(id) {
+    const doc = await Invoice.findByIdAndDelete(id);
+    if (!doc) throw new AppError('Invoice not found', 404, 'NOT_FOUND');
     return doc;
   }
 }

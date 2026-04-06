@@ -93,6 +93,36 @@ class AccountsController {
       sendSuccess(res, { message: 'Withdrawal deleted' });
     } catch (error) { next(error); }
   }
+  // Recurring Plans
+  async getRecurringPlans(req, res, next) {
+    try { sendSuccess(res, { data: await accountsService.getRecurringPlans() }); } catch (e) { next(e); }
+  }
+  async addRecurringPlan(req, res, next) {
+    try { sendSuccess(res, { data: await accountsService.addRecurringPlan(req.body, req.user.id || req.user._id), message: 'Plan created' }, 201); } catch (e) { next(e); }
+  }
+  async updateRecurringPlan(req, res, next) {
+    try { sendSuccess(res, { data: await accountsService.updateRecurringPlan(req.params.id, req.body) }); } catch (e) { next(e); }
+  }
+  async deleteRecurringPlan(req, res, next) {
+    try { await accountsService.deleteRecurringPlan(req.params.id); sendSuccess(res, { message: 'Plan deleted' }); } catch (e) { next(e); }
+  }
+
+  // Invoices
+  async getInvoices(req, res, next) {
+    try { sendSuccess(res, { data: await accountsService.getInvoices(req.query) }); } catch (e) { next(e); }
+  }
+  async generateInvoice(req, res, next) {
+    try { sendSuccess(res, { data: await accountsService.generateInvoice(req.body, req.user.id || req.user._id), message: 'Invoice generated' }, 201); } catch (e) { next(e); }
+  }
+  async updateInvoice(req, res, next) {
+    try { sendSuccess(res, { data: await accountsService.updateInvoice(req.params.id, req.body) }); } catch (e) { next(e); }
+  }
+  async markInvoicePaid(req, res, next) {
+    try { sendSuccess(res, { data: await accountsService.markInvoicePaid(req.params.id, { ...req.body, userId: req.user.id || req.user._id }) }); } catch (e) { next(e); }
+  }
+  async deleteInvoice(req, res, next) {
+    try { await accountsService.deleteInvoice(req.params.id); sendSuccess(res, { message: 'Invoice deleted' }); } catch (e) { next(e); }
+  }
 }
 
 export default new AccountsController();
