@@ -18,11 +18,15 @@ const githubLinkSchema = Joi.object({
 export const createProjectSchema = Joi.object({
   name: Joi.string().trim().max(200).required(),
   description: Joi.string().trim().max(2000).allow(''),
-  type: Joi.string().valid('fixed_cost', 'time_and_material', 'retainer').required(),
+  type: Joi.alternatives().try(
+    Joi.string().valid('fixed_cost', 'time_and_material', 'retainer'),
+    Joi.array().items(Joi.string().valid('fixed_cost', 'time_and_material', 'retainer')).min(1)
+  ).required(),
   status: Joi.string().valid('planning', 'active', 'on_hold', 'completed'),
   startDate: Joi.date().iso().allow(null),
   endDate: Joi.date().iso().min(Joi.ref('startDate')).allow(null),
   budget: Joi.number().min(0),
+  recurringAmount: Joi.number().min(0),
   projectManagers: Joi.array().items(objectId).min(1).required(),
   developers: Joi.array().items(objectId).default([]),
   githubLinks: Joi.array().items(githubLinkSchema).default([]),
@@ -32,7 +36,11 @@ export const createProjectSchema = Joi.object({
 export const updateProjectSchema = Joi.object({
   name: Joi.string().trim().max(200),
   description: Joi.string().trim().max(2000).allow(''),
-  type: Joi.string().valid('fixed_cost', 'time_and_material', 'retainer'),
+  type: Joi.alternatives().try(
+    Joi.string().valid('fixed_cost', 'time_and_material', 'retainer'),
+    Joi.array().items(Joi.string().valid('fixed_cost', 'time_and_material', 'retainer')).min(1)
+  ),
+  recurringAmount: Joi.number().min(0),
   status: Joi.string().valid('planning', 'active', 'on_hold', 'completed'),
   startDate: Joi.date().iso().allow(null),
   endDate: Joi.date().iso().allow(null),

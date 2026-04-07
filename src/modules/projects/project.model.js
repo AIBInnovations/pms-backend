@@ -21,9 +21,14 @@ const projectSchema = new mongoose.Schema(
       default: '',
     },
     type: {
-      type: String,
+      type: [String],
       enum: ['fixed_cost', 'time_and_material', 'retainer'],
       required: [true, 'Project type is required'],
+    },
+    recurringAmount: {
+      type: Number,
+      default: 0,
+      min: 0,
     },
     status: {
       type: String,

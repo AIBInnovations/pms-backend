@@ -1,4 +1,5 @@
 import Project from './project.model.js';
+import { RecurringPlan } from '../accounts/accounts.model.js';
 import Task from '../tasks/task.model.js';
 import Milestone from './milestone.model.js';
 import { AppError, buildPaginationMeta } from '../../utils/index.js';
@@ -73,7 +74,25 @@ class ProjectService {
   }
 
   async create(data, userId) {
+    // Normalize type to array
+    if (typeof data.type === 'string') data.type = [data.type];
+
     const project = await Project.create({ ...data, createdBy: userId });
+
+    // Auto-create recurring plan if retainer is selected
+    const types = Array.isArray(data.type) ? data.type : [data.type];
+    if (types.includes('retainer') && (data.recurringAmount > 0 || data.budget > 0)) {
+      const hasFixedCost = types.includes('fixed_cost');
+      await RecurringPlan.create({
+        project: project._id,
+        setupFee: hasFixedCost ? (data.budget || 0) : 0,
+        recurringAmount: data.recurringAmount || 0,
+        frequency: 'monthly',
+        startDate: data.startDate || new Date(),
+        createdBy: userId,
+      });
+    }
+
     return Project.findById(project._id)
       .populate('projectManagers', 'name email avatar')
       .populate('developers', 'name email avatar');
