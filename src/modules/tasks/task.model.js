@@ -55,7 +55,7 @@ const taskSchema = new mongoose.Schema(
     stage: {
       type: String,
       enum: ['backlog', 'todo', 'in_progress', 'in_review', 'testing', 'done', 'archived'],
-      default: 'backlog',
+      default: 'todo',
     },
     assignees: [
       {
