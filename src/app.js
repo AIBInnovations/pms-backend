@@ -23,6 +23,7 @@ import attendanceRoutes from './modules/attendance/attendance.routes.js';
 import accountsRoutes from './modules/accounts/accounts.routes.js';
 import leadRoutes from './modules/leads/lead.routes.js';
 import activityRoutes from './modules/activities/activity.routes.js';
+import clientRoutes from './modules/clients/client.routes.js';
 
 const app = express();
 
@@ -93,6 +94,7 @@ app.use('/api/v1/attendance', attendanceRoutes);
 app.use('/api/v1/accounts', accountsRoutes);
 app.use('/api/v1/leads', leadRoutes);
 app.use('/api/v1', activityRoutes);
+app.use('/api/v1/clients', clientRoutes);
 
 // Swagger API docs
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, { customCss: '.swagger-ui .topbar { display: none }' }));
