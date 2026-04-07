@@ -93,6 +93,11 @@ const projectSchema = new mongoose.Schema(
       of: [String],
       default: {},
     },
+    linkedLead: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Lead',
+      default: null,
+    },
     createdBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',

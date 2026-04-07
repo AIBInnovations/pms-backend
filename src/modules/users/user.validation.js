@@ -4,7 +4,7 @@ export const createUserSchema = Joi.object({
   name: Joi.string().trim().max(100).required(),
   email: Joi.string().email().lowercase().trim().required(),
   password: Joi.string().min(8).max(128).required(),
-  role: Joi.string().valid('super_admin', 'project_manager', 'developer').required(),
+  role: Joi.string().valid('super_admin', 'project_manager', 'developer', 'sales_executive').required(),
   designation: Joi.string().trim().max(100).allow(''),
   skills: Joi.array().items(Joi.string().trim()),
   phone: Joi.string().trim().max(20).allow(''),
@@ -19,7 +19,7 @@ export const updateUserSchema = Joi.object({
 }).min(1);
 
 export const updateRoleSchema = Joi.object({
-  role: Joi.string().valid('super_admin', 'project_manager', 'developer').required(),
+  role: Joi.string().valid('super_admin', 'project_manager', 'developer', 'sales_executive').required(),
 });
 
 export const updateStatusSchema = Joi.object({
@@ -35,7 +35,7 @@ export const querySchema = Joi.object({
   page: Joi.number().integer().min(1).default(1),
   limit: Joi.number().integer().min(1).max(100).default(20),
   search: Joi.string().trim().allow(''),
-  role: Joi.string().valid('super_admin', 'project_manager', 'developer'),
+  role: Joi.string().valid('super_admin', 'project_manager', 'developer', 'sales_executive'),
   status: Joi.string().valid('active', 'inactive'),
   sortBy: Joi.string().valid('name', 'email', 'createdAt', 'role').default('createdAt'),
   sortOrder: Joi.string().valid('asc', 'desc').default('desc'),
