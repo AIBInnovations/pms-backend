@@ -24,6 +24,7 @@ import accountsRoutes from './modules/accounts/accounts.routes.js';
 import leadRoutes from './modules/leads/lead.routes.js';
 import activityRoutes from './modules/activities/activity.routes.js';
 import clientRoutes from './modules/clients/client.routes.js';
+import proposalRoutes from './modules/proposals/proposal.routes.js';
 
 const app = express();
 
@@ -95,6 +96,7 @@ app.use('/api/v1/accounts', accountsRoutes);
 app.use('/api/v1/leads', leadRoutes);
 app.use('/api/v1', activityRoutes);
 app.use('/api/v1/clients', clientRoutes);
+app.use('/api/v1/proposals', proposalRoutes);
 
 // Swagger API docs
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, { customCss: '.swagger-ui .topbar { display: none }' }));
