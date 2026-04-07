@@ -1,6 +1,7 @@
 import app from './app.js';
 import { env, connectDB, logger } from './config/index.js';
 import { startDeadlineReminder } from './jobs/deadline-reminder.js';
+import { startFollowUpReminder } from './jobs/followup-reminder.js';
 
 const start = async () => {
   await connectDB();
@@ -11,6 +12,7 @@ const start = async () => {
 
   // Start cron jobs
   startDeadlineReminder();
+  startFollowUpReminder();
 
   // Graceful shutdown
   const shutdown = (signal) => {
