@@ -11,9 +11,9 @@ const projectSchema = new mongoose.Schema(
     },
     name: {
       type: String,
-      required: [true, 'Project name is required'],
       trim: true,
       maxlength: 200,
+      default: 'Untitled Project',
     },
     description: {
       type: String,
@@ -23,7 +23,7 @@ const projectSchema = new mongoose.Schema(
     type: {
       type: [String],
       enum: ['fixed_cost', 'time_and_material', 'retainer'],
-      required: [true, 'Project type is required'],
+      default: [],
     },
     recurringAmount: {
       type: Number,
