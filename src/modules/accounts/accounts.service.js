@@ -16,11 +16,11 @@ class AccountsService {
     const [payments, expenses, withdrawals, allPayments, allExpenses, allWithdrawals] = await Promise.all([
       Payment.aggregate([{ $match: dateRange }, { $group: { _id: null, total: { $sum: '$amount' } } }]),
       Expense.aggregate([{ $match: dateRange }, { $group: { _id: null, total: { $sum: '$amount' } } }]),
-      Withdrawal.aggregate([{ $match: dateRange }, { $group: { _id: null, total: { $sum: '$amount' } } }]),
+      Withdrawal.aggregate([{ $match: { ...dateRange, settled: { $ne: true } } }, { $group: { _id: null, total: { $sum: '$amount' } } }]),
       // All-time totals for balance
       Payment.aggregate([{ $group: { _id: null, total: { $sum: '$amount' } } }]),
       Expense.aggregate([{ $group: { _id: null, total: { $sum: '$amount' } } }]),
-      Withdrawal.aggregate([{ $group: { _id: null, total: { $sum: '$amount' } } }]),
+      Withdrawal.aggregate([{ $match: { settled: { $ne: true } } }, { $group: { _id: null, total: { $sum: '$amount' } } }]),
     ]);
 
     const periodReceived = payments[0]?.total || 0;
@@ -34,6 +34,7 @@ class AccountsService {
 
     // Withdrawal breakdown by person (all-time)
     const withdrawalByPerson = await Withdrawal.aggregate([
+      { $match: { settled: { $ne: true } } },
       { $group: { _id: '$person', total: { $sum: '$amount' } } },
     ]);
     const founderWithdrawals = {};
@@ -167,6 +168,26 @@ class AccountsService {
 
   async deleteWithdrawal(id) {
     const doc = await Withdrawal.findByIdAndDelete(id);
+    if (!doc) throw new AppError('Withdrawal not found', 404, 'NOT_FOUND');
+    return doc;
+  }
+
+  async settleWithdrawal(id) {
+    const doc = await Withdrawal.findByIdAndUpdate(
+      id,
+      { settled: true, settledAt: new Date() },
+      { new: true }
+    );
+    if (!doc) throw new AppError('Withdrawal not found', 404, 'NOT_FOUND');
+    return doc;
+  }
+
+  async unsettleWithdrawal(id) {
+    const doc = await Withdrawal.findByIdAndUpdate(
+      id,
+      { settled: false, settledAt: null },
+      { new: true }
+    );
     if (!doc) throw new AppError('Withdrawal not found', 404, 'NOT_FOUND');
     return doc;
   }

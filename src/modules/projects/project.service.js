@@ -53,7 +53,8 @@ class ProjectService {
     const project = await Project.findById(id)
       .populate('projectManagers', 'name email avatar designation')
       .populate('developers', 'name email avatar designation')
-      .populate('createdBy', 'name email');
+      .populate('createdBy', 'name email')
+      .populate('linkedLead', 'leadId contactName company');
 
     if (!project) {
       throw new AppError('Project not found', 404, 'NOT_FOUND');

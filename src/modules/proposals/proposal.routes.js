@@ -17,6 +17,7 @@ router.patch('/:id/status', rbac(...SALES_ROLES), validate(updateStatusSchema), 
 router.post('/:id/duplicate', rbac(...SALES_ROLES), controller.duplicate.bind(controller));
 router.get('/:id/pdf', rbac(...SALES_ROLES), controller.exportPdf.bind(controller));
 router.post('/:id/send', rbac(...SALES_ROLES), controller.sendEmail.bind(controller));
+router.post('/:id/convert-to-invoice', rbac(...SALES_ROLES), controller.convertToInvoice.bind(controller));
 router.delete('/:id', rbac('super_admin'), controller.delete.bind(controller));
 
 export default router;

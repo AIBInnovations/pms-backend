@@ -74,6 +74,13 @@ class ProposalController {
     } catch (e) { next(e); }
   }
 
+  async convertToInvoice(req, res, next) {
+    try {
+      const data = await proposalService.convertToInvoice(req.params.id, req.body.projectId, req.user.id || req.user._id);
+      sendSuccess(res, { data, message: 'Converted to invoice' }, 201);
+    } catch (e) { next(e); }
+  }
+
   async trackPixel(req, res, next) {
     try {
       const trackingId = req.params.trackingId.replace(/\.gif$/, '');

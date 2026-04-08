@@ -56,6 +56,8 @@ const withdrawalSchema = new mongoose.Schema(
     amount: { type: Number, required: true, min: 0 },
     date: { type: Date, required: true },
     description: { type: String, trim: true, default: '' },
+    settled: { type: Boolean, default: false },
+    settledAt: { type: Date, default: null },
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
   },
   { timestamps: true }
@@ -106,6 +108,11 @@ const invoiceSchema = new mongoose.Schema(
     recurringPlan: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'RecurringPlan',
+    },
+    linkedProposal: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Proposal',
+      default: null,
     },
     invoiceNumber: { type: String, unique: true },
     type: {

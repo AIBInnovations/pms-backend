@@ -117,6 +117,77 @@ class LeadService {
     await lead.save();
     return lead;
   }
+
+  // Convert a won lead into a project
+  async convertToProject(leadId, overrides, userId) {
+    const lead = await Lead.findById(leadId);
+    if (!lead) throw new AppError('Lead not found', 404, 'NOT_FOUND');
+    if (lead.convertedProject) throw new AppError('Lead already converted', 400, 'ALREADY_CONVERTED');
+
+    const Project = (await import('../projects/project.model.js')).default;
+
+    // Map service interest to PMS domains
+    const domainMap = {
+      web_app: 'coded_web_app',
+      mobile_app: 'coded_app',
+      shopify: 'shopify',
+      ai: 'ai_development',
+      automation: 'automation',
+    };
+    const domains = (lead.serviceInterest || []).map((s) => domainMap[s]).filter(Boolean);
+
+    const projectData = {
+      name: overrides?.name || lead.company || lead.contactName,
+      description: lead.description || '',
+      type: ['fixed_cost'],
+      status: 'planning',
+      budget: lead.dealValue || 0,
+      domains,
+      linkedLead: lead._id,
+      projectManagers: overrides?.projectManagers || [userId],
+      createdBy: userId,
+      ...overrides,
+    };
+
+    const project = await Project.create(projectData);
+
+    // Auto-create client if doesn't exist
+    let clientId = null;
+    if (lead.email || lead.company) {
+      const Client = (await import('../clients/client.model.js')).default;
+      const existing = await Client.findOne({
+        $or: [
+          ...(lead.company ? [{ company: { $regex: `^${lead.company}$`, $options: 'i' } }] : []),
+          ...(lead.email ? [{ 'contacts.email': lead.email }] : []),
+        ],
+      });
+      if (existing) {
+        clientId = existing._id;
+      } else if (lead.company) {
+        const newClient = await Client.create({
+          company: lead.company,
+          contacts: [{
+            name: lead.contactName,
+            email: lead.email || '',
+            phone: lead.phone || '',
+            isPrimary: true,
+          }],
+          source: lead.source,
+          status: 'active',
+          sourceLead: lead._id,
+          createdBy: userId,
+        });
+        clientId = newClient._id;
+      }
+    }
+
+    // Update lead
+    lead.convertedProject = project._id;
+    lead.status = 'won';
+    await lead.save();
+
+    return { project, clientId };
+  }
 }
 
 export default new LeadService();

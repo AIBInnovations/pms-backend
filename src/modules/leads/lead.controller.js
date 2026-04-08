@@ -59,6 +59,13 @@ class LeadController {
       sendSuccess(res, { message: 'Note deleted' });
     } catch (e) { next(e); }
   }
+
+  async convertToProject(req, res, next) {
+    try {
+      const result = await leadService.convertToProject(req.params.id, req.body, req.user.id || req.user._id);
+      sendSuccess(res, { data: result, message: 'Lead converted to project' }, 201);
+    } catch (e) { next(e); }
+  }
 }
 
 export default new LeadController();

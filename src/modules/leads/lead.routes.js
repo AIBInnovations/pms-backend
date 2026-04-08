@@ -20,6 +20,9 @@ router.patch('/:id', rbac(...SALES_ROLES), validate(updateLeadSchema), audit('le
 // Only Admin can delete
 router.delete('/:id', rbac('super_admin'), audit('lead'), controller.delete.bind(controller));
 
+// Convert to project
+router.post('/:id/convert-to-project', rbac(...SALES_ROLES), controller.convertToProject.bind(controller));
+
 // Internal notes
 router.post('/:id/notes', rbac(...SALES_ROLES), validate(noteSchema), controller.addNote.bind(controller));
 router.delete('/:id/notes/:noteId', rbac(...SALES_ROLES), controller.deleteNote.bind(controller));

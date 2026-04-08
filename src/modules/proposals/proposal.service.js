@@ -212,6 +212,60 @@ class ProposalService {
     }
     return proposal;
   }
+
+  async convertToInvoice(id, projectId, userId) {
+    const proposal = await Proposal.findById(id)
+      .populate('lead', 'convertedProject')
+      .populate('client');
+    if (!proposal) throw new AppError('Proposal not found', 404, 'NOT_FOUND');
+
+    const oneTimeItems = (proposal.lineItems || []).filter((li) => li.type === 'one_time');
+    const recurringItems = (proposal.lineItems || []).filter((li) => li.type === 'recurring');
+
+    const oneTimeSubtotal = oneTimeItems.reduce((sum, li) => sum + ((li.quantity || 0) * (li.unitPrice || 0)), 0);
+    const recurringSubtotal = recurringItems.reduce((sum, li) => sum + ((li.quantity || 0) * (li.unitPrice || 0)), 0);
+
+    let discountAmount = 0;
+    if (proposal.discountType === 'percentage') discountAmount = oneTimeSubtotal * (proposal.discountValue / 100);
+    else if (proposal.discountType === 'fixed') discountAmount = Math.min(proposal.discountValue || 0, oneTimeSubtotal);
+    const oneTimeTotal = Math.max(0, oneTimeSubtotal - discountAmount);
+
+    const targetProjectId = projectId || proposal.lead?.convertedProject;
+    if (!targetProjectId) throw new AppError('No project linked. Convert lead to project first or pass projectId.', 400, 'NO_PROJECT');
+
+    const { Invoice, RecurringPlan } = await import('../accounts/accounts.model.js');
+
+    const created = { invoices: [], recurringPlans: [] };
+
+    if (oneTimeTotal > 0) {
+      const invoice = await Invoice.create({
+        project: targetProjectId,
+        linkedProposal: proposal._id,
+        type: 'one_time',
+        amount: oneTimeTotal,
+        status: 'draft',
+        notes: `Generated from proposal ${proposal.proposalNumber}`,
+        createdBy: userId,
+      });
+      created.invoices.push(invoice);
+    }
+
+    if (recurringSubtotal > 0) {
+      const plan = await RecurringPlan.create({
+        project: targetProjectId,
+        setupFee: 0,
+        recurringAmount: recurringSubtotal,
+        frequency: 'monthly',
+        startDate: new Date(),
+        status: 'active',
+        notes: `Auto-created from proposal ${proposal.proposalNumber}`,
+        createdBy: userId,
+      });
+      created.recurringPlans.push(plan);
+    }
+
+    return created;
+  }
 }
 
 export default new ProposalService();

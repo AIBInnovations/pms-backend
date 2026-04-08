@@ -93,6 +93,18 @@ class AccountsController {
       sendSuccess(res, { message: 'Withdrawal deleted' });
     } catch (error) { next(error); }
   }
+  async settleWithdrawal(req, res, next) {
+    try {
+      const doc = await accountsService.settleWithdrawal(req.params.id);
+      sendSuccess(res, { data: doc, message: 'Withdrawal settled' });
+    } catch (error) { next(error); }
+  }
+  async unsettleWithdrawal(req, res, next) {
+    try {
+      const doc = await accountsService.unsettleWithdrawal(req.params.id);
+      sendSuccess(res, { data: doc, message: 'Withdrawal marked unsettled' });
+    } catch (error) { next(error); }
+  }
   // Recurring Plans
   async getRecurringPlans(req, res, next) {
     try { sendSuccess(res, { data: await accountsService.getRecurringPlans() }); } catch (e) { next(e); }

@@ -26,6 +26,8 @@ router.delete('/expenses/:id', controller.deleteExpense.bind(controller));
 router.get('/withdrawals', controller.getWithdrawals.bind(controller));
 router.post('/withdrawals', controller.addWithdrawal.bind(controller));
 router.patch('/withdrawals/:id', controller.updateWithdrawal.bind(controller));
+router.post('/withdrawals/:id/settle', controller.settleWithdrawal.bind(controller));
+router.post('/withdrawals/:id/unsettle', controller.unsettleWithdrawal.bind(controller));
 router.delete('/withdrawals/:id', controller.deleteWithdrawal.bind(controller));
 
 // Recurring Plans
