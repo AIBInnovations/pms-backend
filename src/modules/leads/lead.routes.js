@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import controller from './lead.controller.js';
-import { auth, rbac, validate, audit } from '../../middleware/index.js';
+import { auth, rbac, validate, audit, upload } from '../../middleware/index.js';
 import { createLeadSchema, updateLeadSchema, leadQuerySchema, noteSchema } from './lead.validation.js';
 
 const router = Router();
@@ -11,6 +11,10 @@ router.use(auth);
 const SALES_ROLES = ['super_admin', 'project_manager', 'sales_executive'];
 
 router.get('/check-duplicate', rbac(...SALES_ROLES), controller.checkDuplicate.bind(controller));
+
+// CSV import — preview returns first 5 rows + headers; commit inserts and dedupes
+router.post('/import/preview', rbac(...SALES_ROLES), upload.single('file'), controller.previewImport.bind(controller));
+router.post('/import', rbac(...SALES_ROLES), upload.single('file'), controller.commitImport.bind(controller));
 router.get('/', rbac(...SALES_ROLES), validate(leadQuerySchema, 'query'), controller.getAll.bind(controller));
 router.get('/:id', rbac(...SALES_ROLES), controller.getById.bind(controller));
 

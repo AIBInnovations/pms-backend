@@ -1,5 +1,5 @@
 import leadService from './lead.service.js';
-import { sendSuccess } from '../../utils/index.js';
+import { sendSuccess, AppError } from '../../utils/index.js';
 
 class LeadController {
   async getAll(req, res, next) {
@@ -64,6 +64,24 @@ class LeadController {
     try {
       const result = await leadService.convertToProject(req.params.id, req.body, req.user.id || req.user._id);
       sendSuccess(res, { data: result, message: 'Lead converted to project' }, 201);
+    } catch (e) { next(e); }
+  }
+
+  async previewImport(req, res, next) {
+    try {
+      if (!req.file?.buffer) throw new AppError('CSV file is required', 400, 'NO_FILE');
+      const csv = req.file.buffer.toString('utf8');
+      sendSuccess(res, { data: await leadService.previewCsv(csv) });
+    } catch (e) { next(e); }
+  }
+
+  async commitImport(req, res, next) {
+    try {
+      if (!req.file?.buffer) throw new AppError('CSV file is required', 400, 'NO_FILE');
+      const csv = req.file.buffer.toString('utf8');
+      const userId = req.user.id || req.user._id;
+      const result = await leadService.importFromCsv(csv, userId);
+      sendSuccess(res, { data: result, message: `Imported ${result.created} of ${result.total} leads` });
     } catch (e) { next(e); }
   }
 }

@@ -66,6 +66,11 @@ const leadSchema = new mongoose.Schema(
     description: { type: String, trim: true, default: '' },
     internalNotes: [internalNoteSchema],
 
+    // Outbound outreach fields (populated by CSV import or manually)
+    postLink: { type: String, trim: true, default: '' },
+    conversationLink: { type: String, trim: true, default: '' },
+    proposalNote: { type: String, trim: true, default: '' },
+
     // Lost / archive tracking
     lostReason: {
       type: String,
@@ -127,6 +132,7 @@ leadSchema.index({ company: 1 });
 leadSchema.index({ priority: -1 });
 leadSchema.index({ nextFollowUpAt: 1 });
 leadSchema.index({ createdAt: -1 });
+leadSchema.index({ conversationLink: 1 });
 
 const Lead = mongoose.model('Lead', leadSchema);
 

@@ -188,6 +188,199 @@ class LeadService {
 
     return { project, clientId };
   }
+
+  // ─── CSV Import ──────────────────────────────────────
+  // Expects buffer of CSV text with headers:
+  //   Date, Name, Project/Post Link, Conversation Link, Technology, Proposal
+  async importFromCsv(csvText, userId) {
+    const rows = parseCsv(csvText);
+    if (rows.length === 0) {
+      return { created: 0, skipped: 0, errors: [], total: 0 };
+    }
+
+    const errors = [];
+    const docsToInsert = [];
+    let skipped = 0;
+
+    // Pre-fetch existing conversation links to dedupe in one query
+    const existingLinks = new Set(
+      (await Lead.find({ conversationLink: { $ne: '' } }).select('conversationLink').lean())
+        .map((l) => l.conversationLink)
+    );
+    // Track within-batch duplicates too
+    const seenLinks = new Set();
+    const seenNameDate = new Set();
+
+    for (let i = 0; i < rows.length; i++) {
+      const row = rows[i];
+      const lineNo = i + 2; // +1 for 1-indexed, +1 for header
+
+      const name = (row['Name'] || row['name'] || '').trim();
+      if (!name) {
+        errors.push({ line: lineNo, error: 'Missing Name' });
+        continue;
+      }
+
+      const dateStr = (row['Date'] || row['date'] || '').trim();
+      const parsedDate = parseDdMmYyyy(dateStr);
+      if (dateStr && !parsedDate) {
+        errors.push({ line: lineNo, error: `Invalid date "${dateStr}" (expected DD-MM-YYYY)` });
+        continue;
+      }
+
+      const postLink = (row['Project/Post Link'] || row['Post Link'] || '').trim();
+      const conversationLink = (row['Conversation Link'] || '').trim();
+      const technology = (row['Technology'] || '').trim();
+      const proposalNote = (row['Proposal'] || '').trim();
+
+      // Dedupe
+      if (conversationLink) {
+        if (existingLinks.has(conversationLink) || seenLinks.has(conversationLink)) {
+          skipped++;
+          continue;
+        }
+        seenLinks.add(conversationLink);
+      } else {
+        const key = `${name.toLowerCase()}|${dateStr}`;
+        if (seenNameDate.has(key)) { skipped++; continue; }
+        seenNameDate.add(key);
+      }
+
+      // Tags from technology (split on , / | or whitespace+slash)
+      const tags = technology
+        ? technology.split(/[,/|]+/).map((t) => t.trim()).filter(Boolean)
+        : [];
+
+      // Try to map technology to serviceInterest enum
+      const serviceInterestMap = {
+        web: 'web_app', website: 'web_app', 'web app': 'web_app', react: 'web_app', node: 'web_app',
+        mobile: 'mobile_app', ios: 'mobile_app', android: 'mobile_app', flutter: 'mobile_app', 'react native': 'mobile_app',
+        shopify: 'shopify',
+        ai: 'ai', ml: 'ai', llm: 'ai', gpt: 'ai',
+        automation: 'automation', zapier: 'automation', n8n: 'automation',
+      };
+      const serviceInterest = [...new Set(
+        tags.map((t) => serviceInterestMap[t.toLowerCase()]).filter(Boolean)
+      )];
+
+      const doc = {
+        contactName: name,
+        source: 'cold_outreach',
+        pipeline: 'new_business',
+        status: 'new',
+        assignee: userId,
+        createdBy: userId,
+        postLink,
+        conversationLink,
+        proposalNote,
+        tags,
+        serviceInterest,
+      };
+      if (parsedDate) doc.createdAt = parsedDate;
+
+      docsToInsert.push(doc);
+    }
+
+    // Bulk insert (run pre-save hooks individually to get leadId)
+    let created = 0;
+    for (const doc of docsToInsert) {
+      try {
+        const lead = new Lead(doc);
+        // Allow custom createdAt to stick
+        if (doc.createdAt) {
+          await lead.save();
+          await Lead.updateOne({ _id: lead._id }, { $set: { createdAt: doc.createdAt } });
+        } else {
+          await lead.save();
+        }
+        created++;
+      } catch (e) {
+        errors.push({ name: doc.contactName, error: e.message });
+      }
+    }
+
+    return { total: rows.length, created, skipped, errors };
+  }
+
+  async previewCsv(csvText) {
+    const rows = parseCsv(csvText);
+    return {
+      total: rows.length,
+      headers: rows[0] ? Object.keys(rows[0]) : [],
+      sample: rows.slice(0, 5),
+    };
+  }
+}
+
+// ─── CSV helpers ──────────────────────────────────────
+
+// Minimal RFC4180-ish CSV parser (handles quoted fields with commas/quotes)
+function parseCsv(text) {
+  const cleaned = text.replace(/^\uFEFF/, ''); // strip BOM
+  const lines = [];
+  let cur = '';
+  let inQuotes = false;
+  for (let i = 0; i < cleaned.length; i++) {
+    const ch = cleaned[i];
+    if (ch === '"') {
+      if (inQuotes && cleaned[i + 1] === '"') { cur += '"'; i++; }
+      else inQuotes = !inQuotes;
+    } else if ((ch === '\n' || ch === '\r') && !inQuotes) {
+      if (cur.length > 0 || lines.length > 0) lines.push(cur);
+      cur = '';
+      if (ch === '\r' && cleaned[i + 1] === '\n') i++;
+    } else {
+      cur += ch;
+    }
+  }
+  if (cur.length > 0) lines.push(cur);
+
+  if (lines.length < 2) return [];
+
+  const splitLine = (line) => {
+    const out = [];
+    let field = '';
+    let q = false;
+    for (let i = 0; i < line.length; i++) {
+      const ch = line[i];
+      if (ch === '"') {
+        if (q && line[i + 1] === '"') { field += '"'; i++; }
+        else q = !q;
+      } else if (ch === ',' && !q) {
+        out.push(field);
+        field = '';
+      } else {
+        field += ch;
+      }
+    }
+    out.push(field);
+    return out;
+  };
+
+  const headers = splitLine(lines[0]).map((h) => h.trim());
+  const rows = [];
+  for (let i = 1; i < lines.length; i++) {
+    if (!lines[i].trim()) continue;
+    const values = splitLine(lines[i]);
+    const obj = {};
+    headers.forEach((h, idx) => { obj[h] = values[idx] != null ? values[idx] : ''; });
+    rows.push(obj);
+  }
+  return rows;
+}
+
+function parseDdMmYyyy(str) {
+  if (!str) return null;
+  // Accept DD-MM-YYYY, DD/MM/YYYY, D-M-YYYY
+  const m = str.trim().match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{2,4})$/);
+  if (!m) return null;
+  const day = parseInt(m[1], 10);
+  const month = parseInt(m[2], 10);
+  let year = parseInt(m[3], 10);
+  if (year < 100) year += 2000;
+  if (month < 1 || month > 12 || day < 1 || day > 31) return null;
+  const d = new Date(year, month - 1, day);
+  return isNaN(d.getTime()) ? null : d;
 }
 
 export default new LeadService();

@@ -26,6 +26,9 @@ export const createLeadSchema = Joi.object({
   tags: Joi.array().items(Joi.string().trim()),
   description: Joi.string().trim().max(5000).allow(''),
   nextFollowUpAt: Joi.date().iso().allow(null, ''),
+  postLink: Joi.string().trim().max(1000).allow(''),
+  conversationLink: Joi.string().trim().max(1000).allow(''),
+  proposalNote: Joi.string().trim().max(5000).allow(''),
 });
 
 export const updateLeadSchema = Joi.object({
@@ -47,6 +50,9 @@ export const updateLeadSchema = Joi.object({
   lostReason: Joi.string().valid(...LOST_REASONS).allow(''),
   lostReasonNote: Joi.string().trim().max(2000).allow(''),
   nextFollowUpAt: Joi.date().iso().allow(null, ''),
+  postLink: Joi.string().trim().max(1000).allow(''),
+  conversationLink: Joi.string().trim().max(1000).allow(''),
+  proposalNote: Joi.string().trim().max(5000).allow(''),
 }).min(1);
 
 export const leadQuerySchema = Joi.object({
