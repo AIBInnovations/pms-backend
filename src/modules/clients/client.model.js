@@ -55,6 +55,11 @@ const clientSchema = new mongoose.Schema(
       default: null,
     },
 
+    // Portal access
+    portalEnabled: { type: Boolean, default: false },
+    portalToken: { type: String, default: null, select: false },
+    portalLastLogin: { type: Date, default: null },
+
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   },
   { timestamps: true }

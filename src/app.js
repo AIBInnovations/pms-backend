@@ -28,6 +28,7 @@ import proposalRoutes from './modules/proposals/proposal.routes.js';
 import emailTemplateRoutes from './modules/email-templates/emailTemplate.routes.js';
 import targetRoutes from './modules/targets/target.routes.js';
 import salesAnalyticsRoutes from './modules/sales-analytics/analytics.routes.js';
+import portalRoutes from './modules/portal/portal.routes.js';
 
 const app = express();
 
@@ -108,6 +109,7 @@ app.use('/api/v1/proposals', proposalRoutes);
 app.use('/api/v1/email-templates', emailTemplateRoutes);
 app.use('/api/v1/targets', targetRoutes);
 app.use('/api/v1/sales-analytics', salesAnalyticsRoutes);
+app.use('/api/v1/portal', portalRoutes);
 
 // Swagger API docs
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, { customCss: '.swagger-ui .topbar { display: none }' }));
