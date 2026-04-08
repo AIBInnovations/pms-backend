@@ -35,11 +35,14 @@ export async function sendResetEmail(to, resetToken) {
   }
 }
 
-export async function sendNotificationEmail(to, subject, html) {
+export async function sendNotificationEmail(to, subject, html, attachments) {
   try {
-    await transporter.sendMail({ from: env.email.from, to, subject, html });
+    const opts = { from: env.email.from, to, subject, html };
+    if (attachments) opts.attachments = attachments;
+    await transporter.sendMail(opts);
     logger.info(`Notification email sent to ${to}: ${subject}`);
   } catch (error) {
     logger.error(`Failed to send notification email to ${to}: ${error.message}`);
+    throw error;
   }
 }

@@ -57,6 +57,34 @@ class ProposalController {
       sendSuccess(res, { data });
     } catch (e) { next(e); }
   }
+
+  async exportPdf(req, res, next) {
+    try {
+      const { pdf, proposal } = await proposalService.generatePdf(req.params.id);
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename="${proposal.proposalNumber}.pdf"`);
+      res.send(pdf);
+    } catch (e) { next(e); }
+  }
+
+  async sendEmail(req, res, next) {
+    try {
+      const data = await proposalService.sendEmail(req.params.id, req.body);
+      sendSuccess(res, { data, message: 'Proposal sent' });
+    } catch (e) { next(e); }
+  }
+
+  async trackPixel(req, res, next) {
+    try {
+      const trackingId = req.params.trackingId.replace(/\.gif$/, '');
+      await proposalService.markViewedByTracking(trackingId);
+      const gif = Buffer.from('R0lGODlhAQABAIAAAP///wAAACH5BAEAAAAALAAAAAABAAEAAAICRAEAOw==', 'base64');
+      res.setHeader('Content-Type', 'image/gif');
+      res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+      res.setHeader('Pragma', 'no-cache');
+      res.send(gif);
+    } catch (e) { next(e); }
+  }
 }
 
 export default new ProposalController();

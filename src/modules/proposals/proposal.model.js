@@ -74,9 +74,13 @@ const proposalSchema = new mongoose.Schema(
     templateName: { type: String, trim: true, default: '' },
 
     sentAt: { type: Date, default: null },
+    sentTo: { type: String, default: '' },
     viewedAt: { type: Date, default: null },
     acceptedAt: { type: Date, default: null },
     rejectedAt: { type: Date, default: null },
+
+    // Tracking
+    trackingId: { type: String, default: () => null, index: true },
 
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   },

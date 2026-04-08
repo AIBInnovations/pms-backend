@@ -1,5 +1,9 @@
+import crypto from 'crypto';
 import Proposal from './proposal.model.js';
 import { AppError } from '../../utils/index.js';
+import { htmlToPdf } from '../../utils/pdf.js';
+import { renderProposalHtml } from './proposal.template.js';
+import { sendNotificationEmail } from '../../utils/email.js';
 
 class ProposalService {
   async getAll(query = {}) {
@@ -139,6 +143,74 @@ class ProposalService {
     return Proposal.find({ isTemplate: true })
       .select('proposalNumber title templateName lineItems createdAt')
       .sort({ createdAt: -1 });
+  }
+
+  async generatePdf(id) {
+    const proposal = await Proposal.findById(id)
+      .populate('lead', 'leadId contactName company email')
+      .populate('client', 'clientId company contacts');
+    if (!proposal) throw new AppError('Proposal not found', 404, 'NOT_FOUND');
+
+    const html = renderProposalHtml(proposal);
+    const pdf = await htmlToPdf(html);
+    return { pdf, proposal };
+  }
+
+  async sendEmail(id, { recipientEmail, subject, body }) {
+    const proposal = await Proposal.findById(id)
+      .populate('lead', 'leadId contactName company email')
+      .populate('client', 'clientId company contacts');
+    if (!proposal) throw new AppError('Proposal not found', 404, 'NOT_FOUND');
+
+    // Determine recipient
+    let to = recipientEmail;
+    if (!to) {
+      to = proposal.lead?.email
+        || proposal.client?.contacts?.find((c) => c.isPrimary)?.email
+        || proposal.client?.contacts?.[0]?.email;
+    }
+    if (!to) throw new AppError('No recipient email', 400, 'NO_RECIPIENT');
+
+    // Generate tracking ID
+    if (!proposal.trackingId) {
+      proposal.trackingId = crypto.randomBytes(16).toString('hex');
+    }
+
+    // Generate PDF
+    const baseUrl = process.env.BACKEND_PUBLIC_URL || '';
+    const html = renderProposalHtml(proposal, { trackingId: proposal.trackingId, baseUrl });
+    const pdfBuffer = await htmlToPdf(html);
+
+    // Email with PDF attachment + tracking pixel in body
+    const emailBody = `${body || ''}<br/><br/><p style="color:#94a3b8;font-size:11px">Proposal: ${proposal.proposalNumber}</p>${baseUrl ? `<img src="${baseUrl}/api/v1/track/proposal/${proposal.trackingId}.gif" width="1" height="1" alt="" />` : ''}`;
+
+    await sendNotificationEmail(to, subject || `Proposal ${proposal.proposalNumber}: ${proposal.title}`, emailBody, [
+      {
+        filename: `${proposal.proposalNumber}.pdf`,
+        content: pdfBuffer,
+        contentType: 'application/pdf',
+      },
+    ]);
+
+    proposal.status = 'sent';
+    proposal.sentAt = new Date();
+    proposal.sentTo = to;
+    await proposal.save();
+
+    return Proposal.findById(id)
+      .populate('lead', 'leadId contactName company')
+      .populate('client', 'clientId company');
+  }
+
+  async markViewedByTracking(trackingId) {
+    const proposal = await Proposal.findOne({ trackingId });
+    if (!proposal) return null;
+    if (!proposal.viewedAt) {
+      proposal.viewedAt = new Date();
+      if (proposal.status === 'sent') proposal.status = 'viewed';
+      await proposal.save();
+    }
+    return proposal;
   }
 }
 

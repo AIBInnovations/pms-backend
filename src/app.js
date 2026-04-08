@@ -22,9 +22,10 @@ import searchRoutes from './modules/search/search.routes.js';
 import attendanceRoutes from './modules/attendance/attendance.routes.js';
 import accountsRoutes from './modules/accounts/accounts.routes.js';
 import leadRoutes from './modules/leads/lead.routes.js';
-import activityRoutes from './modules/activities/activity.routes.js';
+import salesActivityRoutes from './modules/activities/activity.routes.js';
 import clientRoutes from './modules/clients/client.routes.js';
 import proposalRoutes from './modules/proposals/proposal.routes.js';
+import emailTemplateRoutes from './modules/email-templates/emailTemplate.routes.js';
 
 const app = express();
 
@@ -78,6 +79,11 @@ app.get('/api/health', (req, res) => {
   res.json({ success: true, message: 'PMS API is running', timestamp: new Date().toISOString() });
 });
 
+// Public tracking pixel for proposal email opens
+import('./modules/proposals/proposal.controller.js').then(({ default: proposalController }) => {
+  app.get('/api/v1/track/proposal/:trackingId', proposalController.trackPixel.bind(proposalController));
+});
+
 // Routes
 app.use('/api/v1/auth', authRoutes);
 app.use('/api/v1/users', userRoutes);
@@ -94,9 +100,10 @@ app.use('/api/v1/search', searchRoutes);
 app.use('/api/v1/attendance', attendanceRoutes);
 app.use('/api/v1/accounts', accountsRoutes);
 app.use('/api/v1/leads', leadRoutes);
-app.use('/api/v1', activityRoutes);
+app.use('/api/v1', salesActivityRoutes);
 app.use('/api/v1/clients', clientRoutes);
 app.use('/api/v1/proposals', proposalRoutes);
+app.use('/api/v1/email-templates', emailTemplateRoutes);
 
 // Swagger API docs
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, { customCss: '.swagger-ui .topbar { display: none }' }));

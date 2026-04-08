@@ -15,6 +15,8 @@ router.post('/', rbac(...SALES_ROLES), validate(createProposalSchema), controlle
 router.patch('/:id', rbac(...SALES_ROLES), validate(updateProposalSchema), controller.update.bind(controller));
 router.patch('/:id/status', rbac(...SALES_ROLES), validate(updateStatusSchema), controller.updateStatus.bind(controller));
 router.post('/:id/duplicate', rbac(...SALES_ROLES), controller.duplicate.bind(controller));
+router.get('/:id/pdf', rbac(...SALES_ROLES), controller.exportPdf.bind(controller));
+router.post('/:id/send', rbac(...SALES_ROLES), controller.sendEmail.bind(controller));
 router.delete('/:id', rbac('super_admin'), controller.delete.bind(controller));
 
 export default router;
