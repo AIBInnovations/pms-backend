@@ -20,6 +20,11 @@ const documentSchema = new mongoose.Schema(
       trim: true,
       maxlength: 300,
     },
+    type: {
+      type: String,
+      enum: ['rich_text', 'file', 'excalidraw'],
+      default: 'rich_text',
+    },
     content: {
       type: String,
       default: '',

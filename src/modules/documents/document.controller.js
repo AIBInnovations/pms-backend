@@ -30,6 +30,7 @@ class DocumentController {
         title: req.body.title || req.file.originalname,
         category: req.body.category || 'other',
         tags: req.body.tags ? JSON.parse(req.body.tags) : [],
+        type: 'file',
         fileUrl: req.file.cloudUrl,
         fileName: req.file.originalname,
         fileType: req.file.mimetype,
