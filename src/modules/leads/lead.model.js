@@ -111,11 +111,10 @@ leadSchema.pre('save', async function () {
 });
 
 // Update stageEnteredAt when status changes
-leadSchema.pre('save', function (next) {
+leadSchema.pre('save', async function () {
   if (this.isModified('status')) {
     this.stageEnteredAt = new Date();
   }
-  next();
 });
 
 leadSchema.methods.toJSON = function () {
