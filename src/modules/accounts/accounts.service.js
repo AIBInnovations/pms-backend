@@ -69,13 +69,19 @@ class AccountsService {
     };
   }
 
-  // ─── Receivables (project-level: expected vs received) ──
+  // ─── Receivables (project-level: this month's expected vs received) ──
   async getReceivables() {
     const Project = (await import('../projects/project.model.js')).default;
     const projects = await Project.find({ status: { $ne: 'completed' } }).select('name code budget').lean();
 
-    // Total payments received per project
+    // Current month boundaries
+    const now = new Date();
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+
+    // Payments received THIS MONTH per project
     const paymentsByProject = await Payment.aggregate([
+      { $match: { date: { $gte: monthStart, $lt: monthEnd } } },
       { $group: { _id: '$project', received: { $sum: '$amount' } } },
     ]);
     const receivedMap = {};
@@ -83,40 +89,34 @@ class AccountsService {
       receivedMap[p._id.toString()] = p.received;
     }
 
-    // Recurring plans — calculate total expected (setup + recurring × months elapsed)
+    // Recurring plans — this month's expected amount only (no accumulation)
     const plans = await RecurringPlan.find({ status: 'active' }).lean();
-    const recurringExpectedMap = {};
-    const now = new Date();
+    const recurringMap = {};
     for (const plan of plans) {
       const pid = plan.project.toString();
-      const start = new Date(plan.startDate);
-      let monthsElapsed = (now.getFullYear() - start.getFullYear()) * 12 + (now.getMonth() - start.getMonth());
-      if (monthsElapsed < 0) monthsElapsed = 0;
-      // Include the current month as due
-      monthsElapsed += 1;
-
-      let expected = plan.setupFee || 0;
+      let monthlyDue = 0;
       if (plan.frequency === 'monthly') {
-        expected += (plan.recurringAmount || 0) * monthsElapsed;
+        monthlyDue = plan.recurringAmount || 0;
       } else if (plan.frequency === 'quarterly') {
-        expected += (plan.recurringAmount || 0) * Math.ceil(monthsElapsed / 3);
+        // Due in first month of each quarter (Jan, Apr, Jul, Oct)
+        if (now.getMonth() % 3 === 0) monthlyDue = plan.recurringAmount || 0;
       } else if (plan.frequency === 'yearly') {
-        expected += (plan.recurringAmount || 0) * Math.ceil(monthsElapsed / 12);
+        // Due in the start month
+        const startMonth = new Date(plan.startDate).getMonth();
+        if (now.getMonth() === startMonth) monthlyDue = plan.recurringAmount || 0;
       }
-
-      recurringExpectedMap[pid] = (recurringExpectedMap[pid] || 0) + expected;
+      recurringMap[pid] = (recurringMap[pid] || 0) + monthlyDue;
     }
 
     return projects.map((p) => {
       const pid = p._id.toString();
       const received = receivedMap[pid] || 0;
-      // Total expected = project budget (fixed cost) + recurring plan expected
-      const expected = (p.budget || 0) + (recurringExpectedMap[pid] || 0);
+      // This month's expected = recurring amount due this month
+      // For non-recurring projects, use budget as expected (one-time)
+      const expected = recurringMap[pid] || p.budget || 0;
       const receivable = Math.max(0, expected - received);
       return {
         project: { _id: p._id, name: p.name, code: p.code },
-        budget: p.budget || 0,
-        recurringExpected: recurringExpectedMap[pid] || 0,
         expected,
         received,
         receivable,
