@@ -69,58 +69,74 @@ class AccountsService {
     };
   }
 
-  // ─── Receivables (project-level: this month's expected vs received) ──
+  // ─── Receivables (project-level) ──
+  // Non-recurring: budget vs all-time payments (as before)
+  // Recurring: this month's expected vs this month's payments (resets monthly)
   async getReceivables() {
     const Project = (await import('../projects/project.model.js')).default;
     const projects = await Project.find({ status: { $ne: 'completed' } }).select('name code budget').lean();
 
-    // Current month boundaries
     const now = new Date();
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
     const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 1);
 
-    // Payments received THIS MONTH per project
-    const paymentsByProject = await Payment.aggregate([
+    // All-time payments per project
+    const allTimeAgg = await Payment.aggregate([
+      { $group: { _id: '$project', received: { $sum: '$amount' } } },
+    ]);
+    const allTimeMap = {};
+    for (const p of allTimeAgg) allTimeMap[p._id.toString()] = p.received;
+
+    // This month's payments per project
+    const monthAgg = await Payment.aggregate([
       { $match: { date: { $gte: monthStart, $lt: monthEnd } } },
       { $group: { _id: '$project', received: { $sum: '$amount' } } },
     ]);
-    const receivedMap = {};
-    for (const p of paymentsByProject) {
-      receivedMap[p._id.toString()] = p.received;
-    }
+    const monthMap = {};
+    for (const p of monthAgg) monthMap[p._id.toString()] = p.received;
 
-    // Recurring plans — this month's expected amount only (no accumulation)
+    // Recurring plans — build a set of project IDs and their monthly due
     const plans = await RecurringPlan.find({ status: 'active' }).lean();
     const recurringMap = {};
     for (const plan of plans) {
       const pid = plan.project.toString();
-      let monthlyDue = 0;
+      let due = 0;
       if (plan.frequency === 'monthly') {
-        monthlyDue = plan.recurringAmount || 0;
+        due = plan.recurringAmount || 0;
       } else if (plan.frequency === 'quarterly') {
-        // Due in first month of each quarter (Jan, Apr, Jul, Oct)
-        if (now.getMonth() % 3 === 0) monthlyDue = plan.recurringAmount || 0;
+        if (now.getMonth() % 3 === 0) due = plan.recurringAmount || 0;
       } else if (plan.frequency === 'yearly') {
-        // Due in the start month
         const startMonth = new Date(plan.startDate).getMonth();
-        if (now.getMonth() === startMonth) monthlyDue = plan.recurringAmount || 0;
+        if (now.getMonth() === startMonth) due = plan.recurringAmount || 0;
       }
-      recurringMap[pid] = (recurringMap[pid] || 0) + monthlyDue;
+      recurringMap[pid] = (recurringMap[pid] || 0) + due;
     }
 
     return projects.map((p) => {
       const pid = p._id.toString();
-      const received = receivedMap[pid] || 0;
-      // This month's expected = recurring amount due this month
-      // For non-recurring projects, use budget as expected (one-time)
-      const expected = recurringMap[pid] || p.budget || 0;
-      const receivable = Math.max(0, expected - received);
-      return {
-        project: { _id: p._id, name: p.name, code: p.code },
-        expected,
-        received,
-        receivable,
-      };
+      const isRecurring = recurringMap[pid] > 0;
+
+      if (isRecurring) {
+        // Recurring: monthly reset — expected is this month's due, received is this month only
+        const expected = recurringMap[pid];
+        const received = monthMap[pid] || 0;
+        return {
+          project: { _id: p._id, name: p.name, code: p.code },
+          expected,
+          received,
+          receivable: Math.max(0, expected - received),
+        };
+      } else {
+        // Non-recurring: budget vs all-time received
+        const expected = p.budget || 0;
+        const received = allTimeMap[pid] || 0;
+        return {
+          project: { _id: p._id, name: p.name, code: p.code },
+          expected,
+          received,
+          receivable: Math.max(0, expected - received),
+        };
+      }
     }).filter((p) => p.expected > 0 || p.received > 0);
   }
 
