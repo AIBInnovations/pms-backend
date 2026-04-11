@@ -71,10 +71,10 @@ class AccountsService {
 
   // ─── Receivables (project-level: expected vs received) ──
   async getReceivables() {
-    // Get all projects with their budget and total payments received
     const Project = (await import('../projects/project.model.js')).default;
     const projects = await Project.find({ status: { $ne: 'completed' } }).select('name code budget').lean();
 
+    // Total payments received per project
     const paymentsByProject = await Payment.aggregate([
       { $group: { _id: '$project', received: { $sum: '$amount' } } },
     ]);
@@ -83,12 +83,45 @@ class AccountsService {
       receivedMap[p._id.toString()] = p.received;
     }
 
-    return projects.map((p) => ({
-      project: { _id: p._id, name: p.name, code: p.code },
-      budget: p.budget || 0,
-      received: receivedMap[p._id.toString()] || 0,
-      receivable: (p.budget || 0) - (receivedMap[p._id.toString()] || 0),
-    })).filter((p) => p.budget > 0);
+    // Recurring plans — calculate total expected (setup + recurring × months elapsed)
+    const plans = await RecurringPlan.find({ status: 'active' }).lean();
+    const recurringExpectedMap = {};
+    const now = new Date();
+    for (const plan of plans) {
+      const pid = plan.project.toString();
+      const start = new Date(plan.startDate);
+      let monthsElapsed = (now.getFullYear() - start.getFullYear()) * 12 + (now.getMonth() - start.getMonth());
+      if (monthsElapsed < 0) monthsElapsed = 0;
+      // Include the current month as due
+      monthsElapsed += 1;
+
+      let expected = plan.setupFee || 0;
+      if (plan.frequency === 'monthly') {
+        expected += (plan.recurringAmount || 0) * monthsElapsed;
+      } else if (plan.frequency === 'quarterly') {
+        expected += (plan.recurringAmount || 0) * Math.ceil(monthsElapsed / 3);
+      } else if (plan.frequency === 'yearly') {
+        expected += (plan.recurringAmount || 0) * Math.ceil(monthsElapsed / 12);
+      }
+
+      recurringExpectedMap[pid] = (recurringExpectedMap[pid] || 0) + expected;
+    }
+
+    return projects.map((p) => {
+      const pid = p._id.toString();
+      const received = receivedMap[pid] || 0;
+      // Total expected = project budget (fixed cost) + recurring plan expected
+      const expected = (p.budget || 0) + (recurringExpectedMap[pid] || 0);
+      const receivable = Math.max(0, expected - received);
+      return {
+        project: { _id: p._id, name: p.name, code: p.code },
+        budget: p.budget || 0,
+        recurringExpected: recurringExpectedMap[pid] || 0,
+        expected,
+        received,
+        receivable,
+      };
+    }).filter((p) => p.expected > 0 || p.received > 0);
   }
 
   // ─── Payments CRUD ─────────────────────────────────
