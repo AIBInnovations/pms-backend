@@ -133,25 +133,56 @@ class AttendanceService {
     const records = await Attendance.find({
       user: userId,
       date: { $regex: `^${month}` },
-    }).sort({ date: 1 });
+    })
+      .populate('user', 'name email avatar role')
+      .sort({ date: 1 });
 
     let totalHours = 0;
     let presentDays = 0;
     let suspiciousDays = 0;
+    let lateArrivals = 0;      // check-in after 10:00 AM local
+    let incompleteDays = 0;    // missing check-out
+    let checkInMinutesSum = 0; // for avg check-in time
+    let checkInCount = 0;
+    let longestHours = 0;
+    let shortestHours = Infinity;
 
     for (const r of records) {
       presentDays++;
       if (r.isSuspicious) suspiciousDays++;
+      if (r.checkIn) {
+        const ci = new Date(r.checkIn);
+        const mins = ci.getHours() * 60 + ci.getMinutes();
+        checkInMinutesSum += mins;
+        checkInCount++;
+        if (ci.getHours() >= 10 && !(ci.getHours() === 10 && ci.getMinutes() === 0)) {
+          lateArrivals++;
+        }
+      }
       if (r.checkIn && r.checkOut) {
-        totalHours += (r.checkOut - r.checkIn) / (1000 * 60 * 60);
+        const hours = (r.checkOut - r.checkIn) / (1000 * 60 * 60);
+        totalHours += hours;
+        if (hours > longestHours) longestHours = hours;
+        if (hours < shortestHours) shortestHours = hours;
+      } else if (r.checkIn && !r.checkOut) {
+        incompleteDays++;
       }
     }
+
+    const avgHours = presentDays > 0 ? totalHours / presentDays : 0;
+    const avgCheckInMinutes = checkInCount > 0 ? Math.round(checkInMinutesSum / checkInCount) : null;
 
     return {
       month,
       presentDays,
       suspiciousDays,
+      lateArrivals,
+      incompleteDays,
       totalHours: Math.round(totalHours * 100) / 100,
+      avgHours: Math.round(avgHours * 100) / 100,
+      longestHours: longestHours ? Math.round(longestHours * 100) / 100 : 0,
+      shortestHours: shortestHours === Infinity ? 0 : Math.round(shortestHours * 100) / 100,
+      avgCheckInMinutes,
       records,
     };
   }
