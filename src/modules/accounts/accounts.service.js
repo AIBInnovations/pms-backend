@@ -16,11 +16,11 @@ class AccountsService {
     const [payments, expenses, withdrawals, allPayments, allExpenses, allWithdrawals] = await Promise.all([
       Payment.aggregate([{ $match: dateRange }, { $group: { _id: null, total: { $sum: '$amount' } } }]),
       Expense.aggregate([{ $match: dateRange }, { $group: { _id: null, total: { $sum: '$amount' } } }]),
-      Withdrawal.aggregate([{ $match: { ...dateRange, settled: { $ne: true } } }, { $group: { _id: null, total: { $sum: '$amount' } } }]),
+      Withdrawal.aggregate([{ $match: { ...dateRange, settled: { $ne: true } } }, { $group: { _id: null, total: { $sum: { $subtract: ['$amount', { $ifNull: ['$settledAmount', 0] }] } } } }]),
       // All-time totals for balance
       Payment.aggregate([{ $group: { _id: null, total: { $sum: '$amount' } } }]),
       Expense.aggregate([{ $group: { _id: null, total: { $sum: '$amount' } } }]),
-      Withdrawal.aggregate([{ $match: { settled: { $ne: true } } }, { $group: { _id: null, total: { $sum: '$amount' } } }]),
+      Withdrawal.aggregate([{ $match: { settled: { $ne: true } } }, { $group: { _id: null, total: { $sum: { $subtract: ['$amount', { $ifNull: ['$settledAmount', 0] }] } } } }]),
     ]);
 
     const periodReceived = payments[0]?.total || 0;
@@ -32,10 +32,10 @@ class AccountsService {
     const totalWithdrawals = allWithdrawals[0]?.total || 0;
     const availableBalance = totalReceived - totalExpenses - totalWithdrawals;
 
-    // Withdrawal breakdown by person (all-time)
+    // Withdrawal breakdown by person (all-time, pending amount)
     const withdrawalByPerson = await Withdrawal.aggregate([
       { $match: { settled: { $ne: true } } },
-      { $group: { _id: '$person', total: { $sum: '$amount' } } },
+      { $group: { _id: '$person', total: { $sum: { $subtract: ['$amount', { $ifNull: ['$settledAmount', 0] }] } } } },
     ]);
     const founderWithdrawals = {};
     for (const w of withdrawalByPerson) {
@@ -221,20 +221,24 @@ class AccountsService {
     return doc;
   }
 
-  async settleWithdrawal(id) {
-    const doc = await Withdrawal.findByIdAndUpdate(
-      id,
-      { settled: true, settledAt: new Date() },
-      { new: true }
-    );
+  async settleWithdrawal(id, amount) {
+    const doc = await Withdrawal.findById(id);
     if (!doc) throw new AppError('Withdrawal not found', 404, 'NOT_FOUND');
+
+    const settleAmt = amount != null ? Number(amount) : doc.amount - (doc.settledAmount || 0);
+    if (settleAmt <= 0) throw new AppError('Settlement amount must be positive', 400, 'BAD_REQUEST');
+
+    doc.settledAmount = Math.min((doc.settledAmount || 0) + settleAmt, doc.amount);
+    doc.settled = doc.settledAmount >= doc.amount;
+    doc.settledAt = doc.settled ? new Date() : doc.settledAt;
+    await doc.save();
     return doc;
   }
 
   async unsettleWithdrawal(id) {
     const doc = await Withdrawal.findByIdAndUpdate(
       id,
-      { settled: false, settledAt: null },
+      { settled: false, settledAt: null, settledAmount: 0 },
       { new: true }
     );
     if (!doc) throw new AppError('Withdrawal not found', 404, 'NOT_FOUND');
