@@ -95,7 +95,7 @@ class AccountsController {
   }
   async settleWithdrawal(req, res, next) {
     try {
-      const doc = await accountsService.settleWithdrawal(req.params.id);
+      const doc = await accountsService.settleWithdrawal(req.params.id, req.body.amount);
       sendSuccess(res, { data: doc, message: 'Withdrawal settled' });
     } catch (error) { next(error); }
   }
